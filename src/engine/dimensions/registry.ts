@@ -2,7 +2,10 @@
  * Dimension Registry — global catalog of cosmic-galaxy dimension detectors.
  * Spec: §4.2
  *
- * Sprint 3 registers the 4 P0 core dimensions (gravity, kepler, orbital, nbody).
+ * Sprint 4 registers 5 P1 dimensions (perturbation, tidal, relativistic,
+ * darkMatter, entropy) and 3 P2 dimensions (quantum, topology, information).
+ * Combined with Sprint 3's 4 P0 dimensions and the ast placeholder,
+ * the registry has 13 entries (P0+P1+P2) at this point.
  */
 import { BaseDimension, type DimensionModule } from './base.js';
 import type { CPG, CPGNode } from '../cpg/types.js';
@@ -10,6 +13,14 @@ import { GravityDimension } from './gravity.js';
 import { KeplerDimension } from './kepler.js';
 import { OrbitalDimension } from './orbital.js';
 import { NBodyDimension } from './nbody.js';
+import { PerturbationDimension } from './perturbation.js';
+import { TidalDimension } from './tidal.js';
+import { RelativisticDimension } from './relativistic.js';
+import { DarkMatterDimension } from './dark-matter.js';
+import { EntropyDimension } from './entropy.js';
+import { QuantumDimension } from './quantum.js';
+import { TopologyDimension } from './topology.js';
+import { InformationDimension } from './information.js';
 
 class AstPlaceholderDim extends BaseDimension {
   readonly name = 'ast';
@@ -25,6 +36,14 @@ export const DIMENSIONS: Record<string, DimensionModule> = {
   kepler: new KeplerDimension(),
   orbital: new OrbitalDimension(),
   nbody: new NBodyDimension(),
+  perturbation: new PerturbationDimension(),
+  tidal: new TidalDimension(),
+  relativistic: new RelativisticDimension(),
+  darkMatter: new DarkMatterDimension(),
+  entropy: new EntropyDimension(),
+  quantum: new QuantumDimension(),
+  topology: new TopologyDimension(),
+  information: new InformationDimension(),
 };
 
 export function registerDimension(dim: DimensionModule): void {
