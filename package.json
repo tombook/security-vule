@@ -6,6 +6,7 @@
   "scripts": {
     "analyze": "bun --bun src/engine/analyzer.ts",
     "cli": "bun --bun src/integration/cli.ts",
+    "vule": "bun --bun src/integration/vule-cli.ts",
     "mcp": "bun --bun src/mcp/server.ts",
     "evolve": "bun --bun src/evolution/evolver.ts",
     "evolve-enhanced": "bun --bun src/evolution/run-evolution-enhanced.ts",
@@ -23,6 +24,7 @@
   "dependencies": {
     "@anthropic-ai/sdk": "^0.102.0",
     "@google/generative-ai": "^0.24.1",
+    "commander": "^15.0.0",
     "js-yaml": "^4.2.0",
     "ollama": "^0.6.3",
     "openai": "^6.42.0",
