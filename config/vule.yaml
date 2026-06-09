@@ -1,0 +1,40 @@
+# Default VuleEngine configuration (cosmic-galaxy aligned)
+uvrs:
+  weights:
+    taint: 0.20
+    ast: 0.15
+    llm: 0.10
+    consensus: 0.10
+    verify: 0.10
+    chain: 0.10
+    darkMatter: 0.08
+    evolution: 0.05
+    quantum: 0.07
+    entropy: 0.05
+  thresholds:
+    LOW: 0.25
+    MEDIUM: 0.50
+    HIGH: 0.75
+    CRITICAL: 0.85
+
+dimensions:
+  enabled:
+    - ast
+
+llm:
+  provider: minimax
+  model: MiniMax-M3
+  maxFindings: 5
+  verify: false
+  consensusMode: failover
+
+cache:
+  enabled: true
+  size: 1000
+  persistPath: .vule-cache/
+
+report:
+  format: json
+  savePath: cosmic_report
+  topK: 20
+  includeVisualization: false

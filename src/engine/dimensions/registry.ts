@@ -1,0 +1,37 @@
+/**
+ * Dimension Registry — global catalog of cosmic-galaxy dimension detectors.
+ * Spec: §4.2
+ *
+ * Sprint 2 starts with only the `ast` placeholder. Sprint 3+ register
+ * real dimensions (gravity, kepler, orbital, nbody, etc.).
+ */
+import { BaseDimension, type DimensionModule } from './base.js';
+import type { CPG, CPGNode } from '../cpg/types.js';
+
+class AstPlaceholderDim extends BaseDimension {
+  readonly name = 'ast';
+  readonly weight = 0.15;
+  compute(node: CPGNode, _cpg: CPG): number {
+    return Math.min(1, (node.features['complexity'] || 0) / 10);
+  }
+}
+
+export const DIMENSIONS: Record<string, DimensionModule> = {
+  ast: new AstPlaceholderDim(),
+};
+
+export function registerDimension(dim: DimensionModule): void {
+  DIMENSIONS[dim.name] = dim;
+}
+
+export function getEnabledDimensions(flags: Record<string, boolean>): DimensionModule[] {
+  return Object.values(DIMENSIONS).filter(d => flags[d.name] !== false);
+}
+
+export function normalizeWeights(weights: Record<string, number>): Record<string, number> {
+  const total = Object.values(weights).reduce((s, w) => s + (w > 0 ? w : 0), 0);
+  if (total === 0) return weights;
+  const result: Record<string, number> = {};
+  for (const [k, w] of Object.entries(weights)) result[k] = w > 0 ? w / total : 0;
+  return result;
+}
