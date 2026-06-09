@@ -1,0 +1,58 @@
+# Dangerous function sinks per language (for cosmic-galaxy 引力场 dimension)
+php:
+  sql:
+    - mysql_query
+    - mysqli_query
+    - "$pdo->query"
+  command:
+    - shell_exec
+    - exec
+    - system
+    - passthru
+    - popen
+    - proc_open
+  file:
+    - include
+    - require
+    - fopen
+    - file_get_contents
+    - readfile
+    - move_uploaded_file
+  output:
+    - echo
+    - print
+
+python:
+  sql:
+    - cursor.execute
+  command:
+    - os.system
+    - subprocess.call
+    - subprocess.run
+    - eval
+    - exec
+  file:
+    - open
+  output:
+    - print
+
+javascript:
+  sql: []
+  command:
+    - eval
+    - Function
+  file:
+    - require
+    - import
+  output: []
+
+typescript:
+  sql: []
+  command:
+    - eval
+    - Function
+  file:
+    - require
+    - import
+  output:
+    - console.log
