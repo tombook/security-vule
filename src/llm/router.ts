@@ -4,7 +4,7 @@ import { OpenAIProvider } from './providers/openai.js';
 import { AnthropicProvider } from './providers/anthropic.js';
 import { GoogleProvider } from './providers/google.js';
 import { OllamaProvider } from './providers/ollama.js';
-import { OpenAICompatibleProvider, createDeepSeekProvider, createQwenProvider, createGLMProvider, createMoonshotProvider, createMiniMaxProvider } from './providers/openai-compatible.js';
+import { OpenAICompatibleProvider, createDeepSeekProvider, createQwenProvider, createGLMProvider, createZhipuCodingProvider, createMoonshotProvider, createMiniMaxProvider } from './providers/openai-compatible.js';
 
 export type { RouterConfig } from './types.js';
 
@@ -173,11 +173,11 @@ export function createDefaultRouter(): LLMRouter {
   if (process.env.OPENAI_API_KEY) router.registerProvider('openai', new OpenAIProvider());
   if (process.env.ANTHROPIC_API_KEY) router.registerProvider('anthropic', new AnthropicProvider());
   if (process.env.GOOGLE_API_KEY) router.registerProvider('google', new GoogleProvider());
-  if (process.env.DEEPSEEK_API_KEY) router.registerProvider('openai-compatible', createDeepSeekProvider());
-  if (process.env.ZHIPU_API_KEY) router.registerProvider('openai-compatible', createGLMProvider());
-  if (process.env.MOONSHOT_API_KEY) router.registerProvider('openai-compatible', createMoonshotProvider());
-  if (process.env.DASHSCOPE_API_KEY) router.registerProvider('openai-compatible', createQwenProvider());
-  if (process.env.MINIMAX_API_KEY) router.registerProvider('openai-compatible', createMiniMaxProvider());
+  if (process.env.DEEPSEEK_API_KEY) router.registerProvider('deepseek', createDeepSeekProvider());
+  if (process.env.ZHIPU_API_KEY) router.registerProvider('zhipu', createZhipuCodingProvider());
+  if (process.env.MOONSHOT_API_KEY) router.registerProvider('moonshot', createMoonshotProvider());
+  if (process.env.DASHSCOPE_API_KEY) router.registerProvider('qwen', createQwenProvider());
+  if (process.env.MINIMAX_API_KEY) router.registerProvider('minimax', createMiniMaxProvider());
 
   const ollamaHost = process.env.OLLAMA_HOST || 'http://localhost:11434';
   router.registerProvider('ollama', new OllamaProvider(ollamaHost));

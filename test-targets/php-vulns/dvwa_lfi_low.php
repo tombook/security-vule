@@ -1,6 +1,11 @@
 <?php
 
-// The page we wish to display
-$file = $_GET[ 'page' ];
+$file = $_GET['page'];
+
+if (isset($file)) {
+    include($file);
+} else {
+    include('index.php');
+}
 
 ?>

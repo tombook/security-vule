@@ -87,6 +87,9 @@ const ALLOWED_TYPES = new Set([
   'Cross-Site Scripting (XSS)',
   'Path Traversal',
   'File Inclusion',
+  'Local File Inclusion',
+  'Remote File Inclusion',
+  'Local File Inclusion / Remote File Inclusion',
   'Server-Side Request Forgery',
   'Unrestricted File Upload',
   'Cross-Site Request Forgery (CSRF)',
@@ -100,7 +103,43 @@ const ALLOWED_TYPES = new Set([
   'XPath Injection',
   'Open Redirect',
   'Information Exposure',
+  'Code Injection',
 ]);
+
+const TYPE_NORMALIZE: Record<string, string> = {
+  'Local File Inclusion': 'File Inclusion',
+  'Remote File Inclusion': 'File Inclusion',
+  'Local File Inclusion / Remote File Inclusion': 'File Inclusion',
+  'LFI': 'File Inclusion',
+  'RFI': 'File Inclusion',
+  'Path Traversal / Local File Inclusion': 'File Inclusion',
+  'Local File Inclusion (LFI)': 'File Inclusion',
+  'Remote File Inclusion (RFI)': 'File Inclusion',
+  'SQLi': 'SQL Injection',
+  'XSS': 'Cross-Site Scripting (XSS)',
+  'Reflected XSS': 'Cross-Site Scripting (XSS)',
+  'Stored XSS': 'Cross-Site Scripting (XSS)',
+  'DOM XSS': 'Cross-Site Scripting (XSS)',
+  'DOM-based XSS': 'Cross-Site Scripting (XSS)',
+  'SSRF': 'Server-Side Request Forgery',
+  'CSRF': 'Cross-Site Request Forgery (CSRF)',
+  'RCE': 'Command Injection',
+  'Remote Code Execution': 'Command Injection',
+  'OS Command Injection': 'Command Injection',
+  'Command Injection (RCE)': 'Command Injection',
+  'Directory Traversal': 'Path Traversal',
+  'Path Traversal / Directory Traversal': 'Path Traversal',
+  'Path/Directory Traversal': 'Path Traversal',
+  'Arbitrary File Upload': 'Unrestricted File Upload',
+  'Unsafe Deserialization': 'Insecure Deserialization',
+  'XXE': 'XML External Entity',
+  'Info Disclosure': 'Information Exposure',
+  'Information Disclosure': 'Information Exposure',
+  'Hardcoded Credential': 'Hardcoded Secret',
+  'Hardcoded Password': 'Hardcoded Secret',
+  'Dynamic Code Execution': 'Code Injection',
+  'Eval Injection': 'Code Injection',
+};
 
 const ALLOWED_SEVERITY = new Set(['critical', 'high', 'medium', 'low', 'info']);
 
@@ -137,7 +176,17 @@ export function validateFinding(raw: unknown, sourceCode: string): ValidationRes
     return { valid: false, reason: 'not an object', riskScore: 0 };
   }
   const f = raw as Record<string, unknown>;
-  const type = String(f.type || '');
+  const rawType = String(f.type || '');
+  let type = TYPE_NORMALIZE[rawType] || rawType;
+  if (!ALLOWED_TYPES.has(type)) {
+    const lower = rawType.toLowerCase();
+    for (const allowed of ALLOWED_TYPES) {
+      if (lower.includes(allowed.toLowerCase()) || allowed.toLowerCase().includes(lower)) {
+        type = allowed;
+        break;
+      }
+    }
+  }
   const severity = String(f.severity || '').toLowerCase();
   const line = Number(f.line || 0);
   const description = String(f.description || '');

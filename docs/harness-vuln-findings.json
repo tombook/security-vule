@@ -1,0 +1,228 @@
+{
+  "tool": "Defending Code Reference Harness (Anthropic methodology, GLM-5.1 execution)",
+  "target": "security-vule/test-targets/php-vulns/",
+  "total_findings": 23,
+  "by_category": {
+    "command-injection": 2,
+    "lfi": 1,
+    "sql-injection": 6,
+    "xss": 9,
+    "file-upload": 1,
+    "info-disclosure": 3,
+    "deprecated-api": 1
+  },
+  "by_severity": {
+    "HIGH": 12,
+    "MEDIUM": 10,
+    "LOW": 1
+  },
+  "findings": [
+    {
+      "id": "F-01",
+      "file": "dvwa_cmdi_low.php",
+      "line": 6,
+      "category": "command-injection",
+      "severity": "HIGH",
+      "confidence": 1.0,
+      "title": "OS command injection via unsanitized $_REQUEST['ip']"
+    },
+    {
+      "id": "F-02",
+      "file": "dvwa_lfi_low.php",
+      "line": 3,
+      "category": "lfi",
+      "severity": "HIGH",
+      "confidence": 0.95,
+      "title": "Local File Inclusion via $_GET['page']"
+    },
+    {
+      "id": "F-03",
+      "file": "dvwa_sqli_low.php",
+      "line": 6,
+      "category": "sql-injection",
+      "severity": "HIGH",
+      "confidence": 1.0,
+      "title": "SQL injection via $_REQUEST['id']"
+    },
+    {
+      "id": "F-04",
+      "file": "dvwa_sqli_low.php",
+      "line": 14,
+      "category": "xss",
+      "severity": "MEDIUM",
+      "confidence": 1.0,
+      "title": "Reflected XSS via unsanitized $id"
+    },
+    {
+      "id": "F-05",
+      "file": "dvwa_upload_low.php",
+      "line": 5,
+      "category": "file-upload",
+      "severity": "HIGH",
+      "confidence": 1.0,
+      "title": "Unrestricted file upload"
+    },
+    {
+      "id": "F-06",
+      "file": "dvwa_xss_reflected_low.php",
+      "line": 3,
+      "category": "xss",
+      "severity": "MEDIUM",
+      "confidence": 1.0,
+      "title": "Reflected XSS via $_GET['name']"
+    },
+    {
+      "id": "F-07",
+      "file": "dvwa_xss_stored_low.php",
+      "line": 22,
+      "category": "xss",
+      "severity": "HIGH",
+      "confidence": 1.0,
+      "title": "Stored XSS via unsanitized $name"
+    },
+    {
+      "id": "F-08",
+      "file": "dvwa_xss_stored_low.php",
+      "line": 19,
+      "category": "sql-injection",
+      "severity": "HIGH",
+      "confidence": 0.95,
+      "title": "SQL injection in INSERT statement"
+    },
+    {
+      "id": "F-09",
+      "file": "pikachu_rce_ping.php",
+      "line": 33,
+      "category": "command-injection",
+      "severity": "HIGH",
+      "confidence": 1.0,
+      "title": "OS command injection via $_POST['ipaddress']"
+    },
+    {
+      "id": "F-10",
+      "file": "pikachu_rce_ping.php",
+      "line": 13,
+      "category": "xss",
+      "severity": "MEDIUM",
+      "confidence": 1.0,
+      "title": "XSS via $result echoed"
+    },
+    {
+      "id": "F-11",
+      "file": "pikachu_sqli_id.php",
+      "line": 34,
+      "category": "sql-injection",
+      "severity": "HIGH",
+      "confidence": 1.0,
+      "title": "Numeric SQL injection via $_POST['id']"
+    },
+    {
+      "id": "F-12",
+      "file": "pikachu_sqli_id.php",
+      "line": 38,
+      "category": "xss",
+      "severity": "MEDIUM",
+      "confidence": 0.9,
+      "title": "XSS via DB-sourced values"
+    },
+    {
+      "id": "F-13",
+      "file": "pikachu_sqli_str.php",
+      "line": 35,
+      "category": "sql-injection",
+      "severity": "HIGH",
+      "confidence": 1.0,
+      "title": "String SQL injection via $_GET['name']"
+    },
+    {
+      "id": "F-14",
+      "file": "pikachu_sqli_str.php",
+      "line": 39,
+      "category": "xss",
+      "severity": "MEDIUM",
+      "confidence": 0.9,
+      "title": "XSS via DB-sourced values"
+    },
+    {
+      "id": "F-15",
+      "file": "pikachu_xss_reflected.php",
+      "line": 26,
+      "category": "xss",
+      "severity": "MEDIUM",
+      "confidence": 1.0,
+      "title": "Reflected XSS via $_GET['message']"
+    },
+    {
+      "id": "F-16",
+      "file": "sqli_less1.php",
+      "line": 20,
+      "category": "sql-injection",
+      "severity": "HIGH",
+      "confidence": 1.0,
+      "title": "Error-based SQL injection via $_GET['id']"
+    },
+    {
+      "id": "F-17",
+      "file": "sqli_less1.php",
+      "line": 22,
+      "category": "xss",
+      "severity": "MEDIUM",
+      "confidence": 0.95,
+      "title": "XSS via DB values in HTML"
+    },
+    {
+      "id": "F-18",
+      "file": "sqli_less1.php",
+      "line": 21,
+      "category": "info-disclosure",
+      "severity": "LOW",
+      "confidence": 1.0,
+      "title": "Info disclosure via result.txt"
+    },
+    {
+      "id": "F-19",
+      "file": "sqli_less1.php",
+      "line": 19,
+      "category": "deprecated-api",
+      "severity": "HIGH",
+      "confidence": 1.0,
+      "title": "Deprecated mysql_query API"
+    },
+    {
+      "id": "F-20",
+      "file": "sqli_less11.php",
+      "line": 43,
+      "category": "sql-injection",
+      "severity": "HIGH",
+      "confidence": 1.0,
+      "title": "Auth bypass via SQL injection"
+    },
+    {
+      "id": "F-21",
+      "file": "sqli_less11.php",
+      "line": 42,
+      "category": "info-disclosure",
+      "severity": "MEDIUM",
+      "confidence": 1.0,
+      "title": "Credential logging to result.txt"
+    },
+    {
+      "id": "F-22",
+      "file": "sqli_less11.php",
+      "line": 63,
+      "category": "info-disclosure",
+      "severity": "MEDIUM",
+      "confidence": 1.0,
+      "title": "DB error messages exposed"
+    },
+    {
+      "id": "F-23",
+      "file": "sqli_less11.php",
+      "line": 49,
+      "category": "xss",
+      "severity": "MEDIUM",
+      "confidence": 0.95,
+      "title": "XSS via DB-sourced values"
+    }
+  ]
+}
