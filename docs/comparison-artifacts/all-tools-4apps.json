@@ -1,0 +1,202 @@
+{
+  "DVWA": {
+    "gt_count": 40,
+    "tools": {
+      "Semgrep": {
+        "tp": 7,
+        "fp": 0,
+        "fn": 33,
+        "precision": 1.0,
+        "recall": 0.175,
+        "f1": 0.298,
+        "raw_count": 31
+      },
+      "Bearer": {
+        "tp": 4,
+        "fp": 8,
+        "fn": 36,
+        "precision": 0.333,
+        "recall": 0.1,
+        "f1": 0.154,
+        "raw_count": 115
+      },
+      "GLM-5.1": {
+        "tp": 11,
+        "fp": 1,
+        "fn": 29,
+        "precision": 0.917,
+        "recall": 0.275,
+        "f1": 0.423,
+        "raw_count": 50
+      },
+      "security-vule + LLM": {
+        "tp": 14,
+        "fp": 2,
+        "fn": 26,
+        "precision": 0.875,
+        "recall": 0.35,
+        "f1": 0.5,
+        "raw_count": 48
+      },
+      "security-vule": {
+        "tp": 13,
+        "fp": 13,
+        "fn": 7,
+        "precision": 0.5,
+        "recall": 0.65,
+        "f1": 0.5652173913043479,
+        "raw_count": 26
+      }
+    }
+  },
+  "bWAPP": {
+    "gt_count": 92,
+    "tools": {
+      "Semgrep": {
+        "tp": 0,
+        "fp": 40,
+        "fn": 92,
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0,
+        "raw_count": 119
+      },
+      "Bearer": {
+        "tp": 12,
+        "fp": 37,
+        "fn": 80,
+        "precision": 0.245,
+        "recall": 0.13,
+        "f1": 0.17,
+        "raw_count": 296
+      },
+      "GLM-5.1": {
+        "tp": 20,
+        "fp": 42,
+        "fn": 72,
+        "precision": 0.323,
+        "recall": 0.217,
+        "f1": 0.26,
+        "raw_count": 117
+      },
+      "security-vule + LLM": {
+        "tp": 55,
+        "fp": 29,
+        "fn": 37,
+        "precision": 0.655,
+        "recall": 0.598,
+        "f1": 0.625,
+        "raw_count": 84
+      },
+      "security-vule": {
+        "tp": 20,
+        "fp": 28,
+        "fn": 72,
+        "precision": 0.4166666666666667,
+        "recall": 0.21739130434782608,
+        "f1": 0.2857142857142857,
+        "raw_count": 48
+      }
+    }
+  },
+  "sqli-labs": {
+    "gt_count": 69,
+    "tools": {
+      "Semgrep": {
+        "tp": 0,
+        "fp": 0,
+        "fn": 69,
+        "precision": 0,
+        "recall": 0.0,
+        "f1": 0,
+        "raw_count": 184
+      },
+      "Bearer": {
+        "tp": 0,
+        "fp": 0,
+        "fn": 69,
+        "precision": 0,
+        "recall": 0.0,
+        "f1": 0,
+        "raw_count": 209
+      },
+      "GLM-5.1": {
+        "tp": 0,
+        "fp": 49,
+        "fn": 69,
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0,
+        "raw_count": 80
+      },
+      "security-vule + LLM": {
+        "tp": 64,
+        "fp": 0,
+        "fn": 5,
+        "precision": 1.0,
+        "recall": 0.928,
+        "f1": 0.962,
+        "raw_count": 64
+      },
+      "security-vule": {
+        "tp": 55,
+        "fp": 67,
+        "fn": 14,
+        "precision": 0.45081967213114754,
+        "recall": 0.7971014492753623,
+        "f1": 0.5759162303664921,
+        "raw_count": 122
+      }
+    }
+  },
+  "Pikachu": {
+    "gt_count": 53,
+    "tools": {
+      "Semgrep": {
+        "tp": 0,
+        "fp": 0,
+        "fn": 53,
+        "precision": 0,
+        "recall": 0.0,
+        "f1": 0,
+        "raw_count": 60
+      },
+      "Bearer": {
+        "tp": 0,
+        "fp": 0,
+        "fn": 53,
+        "precision": 0,
+        "recall": 0.0,
+        "f1": 0,
+        "raw_count": 140
+      },
+      "GLM-5.1": {
+        "tp": 12,
+        "fp": 16,
+        "fn": 41,
+        "precision": 0.429,
+        "recall": 0.226,
+        "f1": 0.296,
+        "raw_count": 67
+      },
+      "security-vule + LLM": {
+        "tp": 29,
+        "fp": 7,
+        "fn": 24,
+        "precision": 0.806,
+        "recall": 0.547,
+        "f1": 0.652,
+        "raw_count": 61
+      },
+      "security-vule": {
+        "tp": 10,
+        "fp": 10,
+        "fn": 43,
+        "precision": 0.5,
+        "recall": 0.18867924528301888,
+        "f1": 0.27397260273972607,
+        "raw_count": 20
+      }
+    }
+  }
+}

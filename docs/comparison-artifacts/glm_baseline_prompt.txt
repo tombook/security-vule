@@ -1,0 +1,22 @@
+You are a security auditor. Analyze the following PHP file for security vulnerabilities.
+
+Report ONLY real exploitable vulnerabilities (SQL injection, command injection, XSS, file inclusion, SSRF, weak crypto, weak randomness, file upload, authentication bypass, etc.). Skip style issues and best-practice gaps.
+
+For each vulnerability, output ONE block:
+
+<vuln>
+<file>{filename}</file>
+<line>{line_number}</line>
+<category>{sql-injection|command-injection|xss|file-inclusion|ssrf|weak-crypto|weak-randomness|file-upload|auth-bypass|path-traversal|ldap-injection|xpath-injection|xxe|deserialization|open-redirect}</category>
+<severity>{HIGH|MEDIUM|LOW}</severity>
+<confidence>{0.0-1.0}</confidence>
+<title>{one line}</title>
+<description>{root cause and data flow}</description>
+</vuln>
+
+If no vulnerabilities, output: <vuln>NONE</vuln>
+
+FILE:
+```
+{code}
+```

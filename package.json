@@ -1,0 +1,39 @@
+{
+  "name": "security-vule",
+  "version": "1.0.0",
+  "description": "Data-driven white-box vulnerability mining system",
+  "type": "module",
+  "scripts": {
+    "analyze": "bun --bun src/engine/analyzer.ts",
+    "cli": "bun --bun src/integration/cli.ts",
+    "mcp": "bun --bun src/mcp/server.ts",
+    "evolve": "bun --bun src/evolution/evolver.ts",
+    "evolve-enhanced": "bun --bun src/evolution/run-evolution-enhanced.ts",
+    "test": "bun test",
+    "bench": "bun --bun src/integration/benchmark.ts",
+    "benchmark:eval": "bun --bun -e \"import {evaluate,SYNTHETIC_DATASET,formatReport} from './src/benchmark/index.js'; console.log(formatReport(evaluate(SYNTHETIC_DATASET,[])));\""
+  },
+  "exports": {
+    "./plugin": "./src/plugin/index.js",
+    "./benchmark": "./src/benchmark/index.js",
+    "./mcp": "./src/mcp/server.js",
+    "./line-locator": "./src/detection/line-locator.js",
+    "./program-graph": "./src/engine/program-graph.js"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.102.0",
+    "@google/generative-ai": "^0.24.1",
+    "ollama": "^0.6.3",
+    "openai": "^6.42.0",
+    "tree-sitter-php": "^0.24.2"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.0.0",
+    "@types/node": "^25.9.1",
+    "@typescript-eslint/parser": "^8.60.0",
+    "typescript": "^6.0.3"
+  },
+  "trustedDependencies": [
+    "tree-sitter-php"
+  ]
+}

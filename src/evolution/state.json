@@ -1,0 +1,33 @@
+{
+  "round": 0,
+  "bestF1": 0,
+  "bestPrecision": 0,
+  "bestRecall": 0,
+  "bestParams": {
+    "semiMajorAxis": 1.0,
+    "eccentricity": 0.5,
+    "zscore": 1.5
+  },
+  "history": [],
+  "testCaseCounts": {
+    "sql_injection": 12,
+    "xss": 10,
+    "csrf": 10,
+    "path_traversal": 8,
+    "command_injection": 5,
+    "idor": 5,
+    "ssti": 5,
+    "deserialization": 5,
+    "xxe": 5,
+    "hardcoded_secret": 5,
+    "ssrf": 30,
+    "broken_access_control": 8,
+    "cryptographic_failures": 5,
+    "insecure_design": 5,
+    "security_misconfiguration": 5,
+    "vulnerable_components": 5,
+    "authentication_failures": 5,
+    "software_integrity_failures": 5,
+    "security_logging_failures": 5
+  }
+}
