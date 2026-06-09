@@ -24,7 +24,6 @@
 | `src/engine/vule-config.ts` | VuleConfig type + YAML loader | ~80 |
 | `src/engine/vule-engine.ts` | VuleEngine class (main entry) | ~250 |
 | `src/engine/vule-report.ts` | VuleReport + exportReport (JSON/HTML/MD) | ~150 |
-| `src/engine/vule-engine.ts` | exports | ~10 |
 | `config/vule.yaml` | Default config | ~80 |
 | `tests/unit/engine/vule-config.test.ts` | Config loader tests | ~80 |
 | `tests/unit/engine/vule-engine.test.ts` | Engine tests (mock CPG) | ~200 |

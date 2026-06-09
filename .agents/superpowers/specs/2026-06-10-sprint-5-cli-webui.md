@@ -249,14 +249,17 @@ import { loadConfig } from '../../engine/vule-config.js';
 import { generateHTMLReport } from '../../visualization/html-report.js';
 import { writeFileSync } from 'fs';
 import { reportToJSON } from '../../engine/vule-report.js';
+import { parseSource, detectLanguage, type ParseResult } from '../../engine/parser.js';
+import { ProgramGraphBuilder } from '../../engine/program-graph.js';
 
 export async function analyzeCommand(target: string, options: { config?: string; format?: string; export?: string; dimensions?: string }): Promise<void> {
   const config = options.config ? loadConfig(options.config) : undefined;
   const code = readFileSync(target, 'utf-8');
-  // Minimal PG construction (real impl uses existing parser)
-  const pg = codeToPG(code, target);
-  const lang = target.endsWith('.py') ? 'python' : target.endsWith('.ts') ? 'typescript' : target.endsWith('.js') ? 'javascript' : 'php';
-  const cpg = new CPGBuilder(lang as any).build(pg);
+  const lang = detectLanguage(target);
+  // REAL parser integration (no fake stubs)
+  const parsed = parseSource(code, lang);
+  const pg = new ProgramGraphBuilder().build(parsed);
+  const cpg = new CPGBuilder(lang).build(pg);
   const sinks = cpg.sinkNodes().map(n => n.id);
   const engine = new VuleEngine(cpg, sinks, [], config);
   if (options.dimensions) {
@@ -271,20 +274,6 @@ export async function analyzeCommand(target: string, options: { config?: string;
     if (options.export) writeFileSync(options.export, json);
     else console.log(json);
   }
-}
-
-function codeToPG(code: string, filePath: string): any {
-  // Minimal: 1 node per line + DFG edges between consecutive lines
-  const lines = code.split('\n').filter(l => l.trim());
-  const nodes = new Map();
-  lines.forEach((line, i) => {
-    nodes.set(`n${i}`, { id: `n${i}`, type: 'stmt', code: line, lineStart: i + 1, lineEnd: i + 1, properties: new Map() });
-  });
-  const edges = [];
-  for (let i = 0; i < lines.length - 1; i++) {
-    edges.push({ source: `n${i}`, target: `n${i + 1}`, type: 'DFG' });
-  }
-  return { nodes, edges, nodeCount: lines.length, edgeCount: edges.length, edgeTypeCounts: {} as any, filePath, language: 'php' };
 }
 ```
 
@@ -331,12 +320,18 @@ function makeMockCPG(file: string, code: string): any {
 // src/integration/commands/visualize.ts
 /**
  * vule visualize <report.html> — open existing HTML report in browser
+ * Cross-platform: macOS (open), Linux (xdg-open), Windows (start)
  */
 export async function visualizeCommand(path: string): Promise<void> {
   const { spawn } = await import('child_process');
   const url = `file://${process.cwd()}/${path}`;
-  console.log(`Opening ${url}...`);
-  spawn('open', [url], { stdio: 'inherit' });
+  const platform = process.platform;
+  let cmd: string, args: string[];
+  if (platform === 'darwin') { cmd = 'open'; args = [url]; }
+  else if (platform === 'win32') { cmd = 'start'; args = [url]; }
+  else { cmd = 'xdg-open'; args = [url]; } // Linux + others
+  console.log(`Opening ${url} via ${cmd}...`);
+  spawn(cmd, args, { stdio: 'inherit' });
 }
 ```
 
