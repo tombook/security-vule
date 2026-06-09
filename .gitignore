@@ -12,6 +12,9 @@ corpus/
 pikachu/
 sqli-labs/
 
+# Vule cache (per config/vule.yaml)
+.vule-cache/
+
 # OS / editor
 .DS_Store
 Thumbs.db
