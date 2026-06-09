@@ -2,11 +2,14 @@
  * Dimension Registry — global catalog of cosmic-galaxy dimension detectors.
  * Spec: §4.2
  *
- * Sprint 2 starts with only the `ast` placeholder. Sprint 3+ register
- * real dimensions (gravity, kepler, orbital, nbody, etc.).
+ * Sprint 3 registers the 4 P0 core dimensions (gravity, kepler, orbital, nbody).
  */
 import { BaseDimension, type DimensionModule } from './base.js';
 import type { CPG, CPGNode } from '../cpg/types.js';
+import { GravityDimension } from './gravity.js';
+import { KeplerDimension } from './kepler.js';
+import { OrbitalDimension } from './orbital.js';
+import { NBodyDimension } from './nbody.js';
 
 class AstPlaceholderDim extends BaseDimension {
   readonly name = 'ast';
@@ -18,6 +21,10 @@ class AstPlaceholderDim extends BaseDimension {
 
 export const DIMENSIONS: Record<string, DimensionModule> = {
   ast: new AstPlaceholderDim(),
+  gravity: new GravityDimension(),
+  kepler: new KeplerDimension(),
+  orbital: new OrbitalDimension(),
+  nbody: new NBodyDimension(),
 };
 
 export function registerDimension(dim: DimensionModule): void {
