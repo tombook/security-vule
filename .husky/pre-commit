@@ -1,1 +1,7 @@
+#!/usr/bin/env bash
+# vule pre-commit hook
+# Runs: lint-staged (ESLint + Prettier on staged files)
+# Note: gitleaks secret scanning is run via .github/workflows/security-audit.yml
+#       (install gitleaks locally: brew install gitleaks)
+set -euo pipefail
 bunx lint-staged

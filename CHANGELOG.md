@@ -8,19 +8,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Gitleaks secret scanning**: `.gitleaks.toml` with 4 custom rules (security-vule API keys, Anthropic, OpenAI, Zhipu); `.github/workflows/license-check.yml` runs on every push
+- **License compliance CI**: `.github/workflows/license-check.yml` runs `license:check` (blocks GPL/AGPL-UNKNOWN/UNKNOWN/WTFPL); uploads license report to `docs/compliance/licenses.txt`
+- **Pre-commit gitleaks note**: `.husky/pre-commit` documents that gitleaks runs via GitHub Action (`brew install gitleaks` for local)
+- **Secret redaction tests**: `tests/unit/security/gitleaks-integration.test.ts` (7 tests) — validates 5 secret patterns (AWS/Anthropic/GitHub/JWT/PEM) + 2 prompt injection scenarios
 - **Release automation**: `.github/workflows/release-please.yml` + `release-please-config.json` (auto semver + CHANGELOG bump)
 - **Dependabot**: `.github/dependabot.yml` (weekly npm + GitHub Actions auto-PR, grouped)
 - **CycloneDX SBOM**: `.github/workflows/sbom.yml` + `bun run sbom` (266 components, attached to releases)
 - **Snyk SCA**: `.github/workflows/security-audit.yml` (npm audit + Snyk + gitleaks + OpenSSF Scorecard)
 - **License check**: `bun run license:check` (blocks GPL/AGPL-UNKNOWN/UNKNOWN/WTFPL)
-- **`.npmrc`**: official npm registry for audit (overrides mirror)
+- **`.npmrc`**: official npm registry for audit (overrides mirrors)
 - ESLint + Prettier configuration (`eslint.config.js`, `.prettierrc.json`)
 - Husky pre-commit hook with lint-staged
-- Test coverage reporting (target: ≥80% line coverage, current: 72.32%)
+- Test coverage reporting (target: ≥80% line coverage, current: 73.02%)
 - `CONTRIBUTING.md` — contributor guide
 - `CHANGELOG.md` — this file
 - `SECURITY.md` — vulnerability disclosure policy
 - `Dockerfile` (multi-stage, multi-arch)
+- `TypeDoc` auto-generated API docs (`bun run docs:api`)
+- **`examples/`** — 5 working examples (basic-ast, llm-scan, cpg-construction, web-ui, custom-dimension)
+- **`docs/architecture/c4-model.md`** — 4-level C4 architecture diagrams (6 mermaid)
+- **`src/utils/logger.ts`** — pino structured logging with auto-redact
+- **`src/utils/tracing.ts`** — OpenTelemetry distributed tracing
+- **`src/utils/metrics.ts`** — 13 Prometheus metrics
+- **`src/utils/health.ts`** — `/healthz` Kubernetes health probe + graceful shutdown
 - Engineering roadmap v1.0 (`docs/engineering-roadmap-v1.0.md`)
 - Evolution roadmap v1.0 (`docs/evolution-roadmap-v1.0.md`)
 - v0.3 competitive comparison vs Anthropic Harness + Alibaba OCR (`docs/v0.3-competitive-comparison.md`)
@@ -28,6 +39,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - Bumped to v0.3.0 development cycle
+- **Type safety**: 23 `any` usages → 0 (across 13 files)
+- **ESLint config**: `examples/` exempted from `no-explicit-any` (demonstrative code)
+- **Pre-commit hook**: now documents gitleaks as GitHub Action
 
 ## [0.3.0] - 2026-06-10
 

@@ -1,0 +1,75 @@
+# gitleaks configuration for security-vule
+# Docs: https://github.com/gitleaks/gitleaks/blob/master/config/gitleaks.toml
+
+title = "security-vule gitleaks config"
+
+# Allowlist: test fixtures, docs, build artifacts
+[allowlist]
+  description = "Allow test fixtures and generated docs"
+  paths = [
+    '''test-targets/.*''',
+    '''docs/security-vule-llm-results\.json''',
+    '''docs/security-vule-llm-improved-results\.json''',
+    '''docs/harness-vuln-findings\.json''',
+    '''docs/ocr-review-results\.json''',
+    '''docs/security-vule-consensus-results\.json''',
+    '''docs/security-vule-failover-results\.json''',
+    '''docs/poc-verification-.*\.json''',
+    '''docs/all-tools-scores\.md''',
+    '''docs/comparison-artifacts/.*''',
+    '''docs/benchmark-report\.md''',
+    '''\.vule-cache/.*''',
+    '''poc-validator/__pycache__/.*''',
+    '''\.venv/.*''',
+    '''node_modules/.*''',
+    '''dist/.*''',
+    '''\.vule-cache/.*''',
+    '''coverage/.*''',
+  ]
+
+# Allowlist: example commits and CHANGELOG (legitimate mentions)
+  regexes = [
+    # Allow commit-like patterns in CHANGELOG
+    '''ghp_[A-Za-z0-9]{36}''',
+    '''AKIA[0-9A-Z]{16}''',
+    # Allow mention in docs (not actual secrets)
+    '''private[_-]?key.{0,5}=.{0,5}REDACTED''',
+    '''password[_-]?=.{0,5}REDACTED''',
+  ]
+
+# Custom rules for security-vule specific patterns
+[[rules]]
+  id = "security-vule-api-key"
+  description = "security-vule API keys"
+  regex = '''sk-(cp|cpj)-[A-Za-z0-9]{40,60}'''
+  tags = ["secret", "api-key"]
+
+  [rules.allowlist]
+    regexes = [
+      '''sk-cp-XXXXX''',
+      '''sk-cp-placeholder''',
+    ]
+    paths = ['''docs/.*''']
+
+[[rules]]
+  id = "anthropic-api-key"
+  description = "Anthropic API keys"
+  regex = '''sk-ant-[A-Za-z0-9-]{32,}'''
+  tags = ["secret", "api-key", "anthropic"]
+
+[[rules]]
+  id = "openai-api-key"
+  description = "OpenAI API keys (legacy + new formats)"
+  regex = '''sk-(proj-)?[A-Za-z0-9]{20,80}T3BlbkFJ[A-Za-z0-9]{20,80}'''
+  tags = ["secret", "api-key", "openai"]
+
+[[rules]]
+  id = "zhipu-coding-key"
+  description = "Zhipu GLM coding API key"
+  regex = '''[0-9a-f]{32}\.[A-Za-z0-9]{12,16}'''
+  tags = ["secret", "api-key", "zhipu"]
+
+  [rules.allowlist]
+    paths = ['''docs/.*''']
+
+# Built-in rules are enabled by default in gitleaks v8+
