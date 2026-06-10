@@ -1,0 +1,59 @@
+# Dependabot configuration for security-vule
+# Docs: https://docs.github.com/en/code-security/dependabot/dependabot-version-updates
+
+version: 2
+
+# Weekly scan for npm dependencies
+updates:
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+      timezone: "UTC"
+    commit-message:
+      prefix: "deps"
+      include: "scope"
+    labels:
+      - "dependencies"
+      - "automated"
+    open-pull-requests-limit: 10
+    # Group updates to reduce PR noise
+    groups:
+      production-dependencies:
+        dependency-type: "production"
+        update-types:
+          - "minor"
+          - "patch"
+      development-dependencies:
+        dependency-type: "development"
+        update-types:
+          - "minor"
+          - "patch"
+      security-updates:
+        applies-to: security-updates
+    # Ignore major version updates for unstable deps
+    ignore:
+      - dependency-name: "typescript"
+        update-types: ["version-update:semver-major"]
+    # Reviewers
+    reviewers:
+      - "security-vule/maintainers"
+    # Assignees
+    assignees:
+      - "security-vule-bot"
+
+# GitHub Actions versioning
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    commit-message:
+      prefix: "ci"
+    labels:
+      - "ci"
+      - "automated"
+    groups:
+      action-updates:
+        patterns: ["*"]

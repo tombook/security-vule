@@ -19,6 +19,9 @@
     "format:check": "prettier --check 'src/**/*.ts' 'tests/**/*.ts'",
     "bench": "bun --bun src/integration/benchmark.ts",
     "benchmark:eval": "bun --bun -e \"import {evaluate,SYNTHETIC_DATASET,formatReport} from './src/benchmark/index.js'; console.log(formatReport(evaluate(SYNTHETIC_DATASET,[])));\"",
+    "sbom": "bun --bun -e \"import { spawn } from 'child_process'; const r = spawn('node', ['node_modules/@cyclonedx/cyclonedx-npm/bin/cyclonedx-npm-cli.js', '--output-format', 'JSON', '--output-file', 'sbom.json', '--spec-version', '1.5'], { stdio: 'inherit' }); r.on('exit', (c) => process.exit(c || 0));\"",
+    "license:check": "bun x license-checker --production --failOn 'GPL;AGPL-UNKNOWN;UNKNOWN;WTFPL'",
+    "license:summary": "bun x license-checker --production --json | bun --bun -e \"process.stdin.on('data', d => { const r = JSON.parse(d.toString()); const counts = {}; for (const k in r) counts[r[k].licenses] = (counts[r[k].licenses] || 0) + 1; console.log(counts); });\"",
     "prepare": "husky"
   },
   "lint-staged": {
@@ -47,6 +50,7 @@
     "tree-sitter-php": "^0.24.2"
   },
   "devDependencies": {
+    "@cyclonedx/cyclonedx-npm": "^4.2.1",
     "@types/bun": "^1.0.0",
     "@types/node": "^25.9.1",
     "@typescript-eslint/eslint-plugin": "^8.61.0",
@@ -54,11 +58,13 @@
     "eslint": "9",
     "eslint-config-prettier": "^10.1.8",
     "husky": "^9.1.7",
+    "license-checker": "^25.0.1",
     "lint-staged": "^17.0.7",
     "prettier": "^3.8.4",
     "typescript": "^6.0.3"
   },
   "trustedDependencies": [
+    "libxmljs2",
     "tree-sitter-php"
   ]
 }

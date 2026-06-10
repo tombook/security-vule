@@ -1,0 +1,56 @@
+name: Release Please
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Release Please
+        id: release
+        uses: googleapis/release-please-action@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          release-type: node
+          package-name: security-vule
+          changelog-types: |
+            - type: feat
+              section: Features
+              hidden: false
+            - type: fix
+              section: Bug Fixes
+              hidden: false
+            - type: perf
+              section: Performance
+              hidden: false
+            - type: refactor
+              section: Refactoring
+              hidden: false
+            - type: docs
+              section: Documentation
+              hidden: false
+            - type: test
+              section: Tests
+              hidden: false
+            - type: build
+              section: Build System
+              hidden: false
+            - type: ci
+              section: CI/CD
+              hidden: false
+            - type: chore
+              section: Miscellaneous
+              hidden: true
+
+      - name: Print release PR
+        if: steps.release.outputs.release_created
+        run: |
+          echo "Release PR created: ${{ steps.release.outputs.release_url }}"

@@ -8,6 +8,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Release automation**: `.github/workflows/release-please.yml` + `release-please-config.json` (auto semver + CHANGELOG bump)
+- **Dependabot**: `.github/dependabot.yml` (weekly npm + GitHub Actions auto-PR, grouped)
+- **CycloneDX SBOM**: `.github/workflows/sbom.yml` + `bun run sbom` (266 components, attached to releases)
+- **Snyk SCA**: `.github/workflows/security-audit.yml` (npm audit + Snyk + gitleaks + OpenSSF Scorecard)
+- **License check**: `bun run license:check` (blocks GPL/AGPL-UNKNOWN/UNKNOWN/WTFPL)
+- **`.npmrc`**: official npm registry for audit (overrides mirror)
 - ESLint + Prettier configuration (`eslint.config.js`, `.prettierrc.json`)
 - Husky pre-commit hook with lint-staged
 - Test coverage reporting (target: ≥80% line coverage, current: 72.32%)

@@ -3,6 +3,9 @@
 node_modules/
 dist/
 *.log
+sbom.json
+snyk-results.json
+package-lock.json
 
 # Large data directories (not part of source)
 competitors/

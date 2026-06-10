@@ -1,0 +1,56 @@
+name: SBOM
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  generate-sbom:
+    name: Generate CycloneDX SBOM
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Generate SBOM (JSON)
+        run: |
+          bun --bun -e "
+          import { spawn } from 'child_process';
+          const result = spawn('node', [
+            'node_modules/@cyclonedx/cyclonedx-npm/bin/cyclonedx-npm-cli.js',
+            '--output-format', 'JSON',
+            '--output-file', 'sbom.json',
+            '--spec-version', '1.5',
+          ], { stdio: 'inherit' });
+          result.on('exit', (code) => process.exit(code || 0));
+          "
+
+      - name: Upload SBOM artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom
+          path: sbom.json
+          retention-days: 90
+
+      - name: Attach SBOM to release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            sbom.json
+          fail_on_unmatched_files: true
