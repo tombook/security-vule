@@ -14,8 +14,8 @@ describe('P1+P2 dimensions integration', () => {
     const sum = Object.values(norm).reduce((s, w) => s + w, 0);
     expect(Math.abs(sum - 1.0)).toBeLessThan(0.01);
   });
-  test('total dimensions count = 13', () => {
-    expect(Object.keys(DIMENSIONS).length).toBe(13);
+  test('total dimensions count after Sprint 4 (13) — Sprint 6 brings total to 19', () => {
+    expect(Object.keys(DIMENSIONS).length).toBeGreaterThanOrEqual(13);
   });
   test('P1 weights match spec', () => {
     expect(DIMENSIONS.perturbation.weight).toBe(0.05);

@@ -2,10 +2,9 @@
  * Dimension Registry — global catalog of cosmic-galaxy dimension detectors.
  * Spec: §4.2
  *
- * Sprint 4 registers 5 P1 dimensions (perturbation, tidal, relativistic,
- * darkMatter, entropy) and 3 P2 dimensions (quantum, topology, information).
- * Combined with Sprint 3's 4 P0 dimensions and the ast placeholder,
- * the registry has 13 entries (P0+P1+P2) at this point.
+ * Sprint 6 adds 6 math framework dimensions (typeTheory, functor, tda,
+ * pureFunctional, abstractInterpret, symbolicExec), bringing the
+ * total to 19 dimensions.
  */
 import { BaseDimension, type DimensionModule } from './base.js';
 import type { CPG, CPGNode } from '../cpg/types.js';
@@ -21,6 +20,12 @@ import { EntropyDimension } from './entropy.js';
 import { QuantumDimension } from './quantum.js';
 import { TopologyDimension } from './topology.js';
 import { InformationDimension } from './information.js';
+import { TypeTheoryDimension } from './type-theory.js';
+import { FunctorDimension } from './functor.js';
+import { TdaDimension } from './tda.js';
+import { PureFunctionalDimension } from './pure-functional.js';
+import { AbstractInterpretDimension } from './abstract-interpret.js';
+import { SymbolicExecDimension } from './symbolic-exec.js';
 
 class AstPlaceholderDim extends BaseDimension {
   readonly name = 'ast';
@@ -44,6 +49,12 @@ export const DIMENSIONS: Record<string, DimensionModule> = {
   quantum: new QuantumDimension(),
   topology: new TopologyDimension(),
   information: new InformationDimension(),
+  typeTheory: new TypeTheoryDimension(),
+  functor: new FunctorDimension(),
+  tda: new TdaDimension(),
+  pureFunctional: new PureFunctionalDimension(),
+  abstractInterpret: new AbstractInterpretDimension(),
+  symbolicExec: new SymbolicExecDimension(),
 };
 
 export function registerDimension(dim: DimensionModule): void {
