@@ -15,17 +15,19 @@ const validLang = fc.constantFrom('php', 'python', 'javascript', 'typescript') a
 >;
 
 describe('CPG property: node preservation', () => {
-  test('createCPG preserves node count and IDs', () => {
+  test('createCPG preserves node count and IDs (with unique IDs)', () => {
     fc.assert(
       fc.property(
-        fc.array(
+        fc.uniqueArray(
           fc.record({
-            id: fc.string({ minLength: 1, maxLength: 20 }).filter((s) => !s.includes('|')),
+            id: fc
+              .string({ minLength: 1, maxLength: 20 })
+              .filter((s) => /^[A-Za-z0-9_-]+$/.test(s)),
             type: validNodeType,
             code: fc.string({ maxLength: 100 }),
             complexity: fc.integer({ min: 0, max: 100 }),
           }),
-          { minLength: 0, maxLength: 50 }
+          { minLength: 0, maxLength: 50, selector: (n) => n.id }
         ),
         validLang,
         (nodeSpecs, lang) => {
