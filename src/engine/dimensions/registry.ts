@@ -2,9 +2,10 @@
  * Dimension Registry — global catalog of cosmic-galaxy dimension detectors.
  * Spec: §4.2
  *
- * Sprint 6 adds 6 math framework dimensions (typeTheory, functor, tda,
- * pureFunctional, abstractInterpret, symbolicExec), bringing the
- * total to 19 dimensions.
+ * Sprint 8 adds 10 P3 dimensions (chaos, phaseTransition, fieldTheory,
+ * fractal, nonEquilibrium, gameTheory, transfer, differentialGeometry,
+ * renormalization, categoryBasic), bringing the total to 29 dimensions
+ * (23 cosmic-galaxy + 6 math frameworks).
  */
 import { BaseDimension, type DimensionModule } from './base.js';
 import type { CPG, CPGNode } from '../cpg/types.js';
@@ -26,6 +27,16 @@ import { TdaDimension } from './tda.js';
 import { PureFunctionalDimension } from './pure-functional.js';
 import { AbstractInterpretDimension } from './abstract-interpret.js';
 import { SymbolicExecDimension } from './symbolic-exec.js';
+import { ChaosDimension } from './chaos.js';
+import { PhaseTransitionDimension } from './phase-transition.js';
+import { FieldTheoryDimension } from './field-theory.js';
+import { FractalDimension } from './fractal.js';
+import { NonEquilibriumDimension } from './non-equilibrium.js';
+import { GameTheoryDimension } from './game-theory.js';
+import { TransferDimension } from './transfer.js';
+import { DifferentialGeometryDimension } from './differential-geometry.js';
+import { RenormalizationDimension } from './renormalization.js';
+import { CategoryBasicDimension } from './category-basic.js';
 
 class AstPlaceholderDim extends BaseDimension {
   readonly name = 'ast';
@@ -55,6 +66,16 @@ export const DIMENSIONS: Record<string, DimensionModule> = {
   pureFunctional: new PureFunctionalDimension(),
   abstractInterpret: new AbstractInterpretDimension(),
   symbolicExec: new SymbolicExecDimension(),
+  chaos: new ChaosDimension(),
+  phaseTransition: new PhaseTransitionDimension(),
+  fieldTheory: new FieldTheoryDimension(),
+  fractal: new FractalDimension(),
+  nonEquilibrium: new NonEquilibriumDimension(),
+  gameTheory: new GameTheoryDimension(),
+  transfer: new TransferDimension(),
+  differentialGeometry: new DifferentialGeometryDimension(),
+  renormalization: new RenormalizationDimension(),
+  categoryBasic: new CategoryBasicDimension(),
 };
 
 export function registerDimension(dim: DimensionModule): void {
