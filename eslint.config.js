@@ -53,9 +53,9 @@ export default [
       'prefer-const': 'error',
     },
   },
-  // Relax rules in test files
+  // Relax rules in test files and examples (demonstrative code, may use `any`)
   {
-    files: ['tests/**/*.ts', '**/*.test.ts'],
+    files: ['tests/**/*.ts', '**/*.test.ts', 'examples/**/*.ts'],
     rules: {
       '@typescript-eslint/no-explicit-any': 'off',
       '@typescript-eslint/no-unused-vars': 'off',

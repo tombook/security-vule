@@ -22,6 +22,8 @@
     "sbom": "bun --bun -e \"import { spawn } from 'child_process'; const r = spawn('node', ['node_modules/@cyclonedx/cyclonedx-npm/bin/cyclonedx-npm-cli.js', '--output-format', 'JSON', '--output-file', 'sbom.json', '--spec-version', '1.5'], { stdio: 'inherit' }); r.on('exit', (c) => process.exit(c || 0));\"",
     "license:check": "bun x license-checker --production --failOn 'GPL;AGPL-UNKNOWN;UNKNOWN;WTFPL'",
     "license:summary": "bun x license-checker --production --json | bun --bun -e \"process.stdin.on('data', d => { const r = JSON.parse(d.toString()); const counts = {}; for (const k in r) counts[r[k].licenses] = (counts[r[k].licenses] || 0) + 1; console.log(counts); });\"",
+    "docs:api": "bun x typedoc",
+    "docs:api:watch": "bun x typedoc --watch",
     "prepare": "husky"
   },
   "lint-staged": {
@@ -70,6 +72,7 @@
     "license-checker": "^25.0.1",
     "lint-staged": "^17.0.7",
     "prettier": "^3.8.4",
+    "typedoc": "^0.28.19",
     "typescript": "^6.0.3"
   },
   "trustedDependencies": [

@@ -1,0 +1,41 @@
+{
+  "$schema": "https://typedoc.org/schema.json",
+  "entryPoints": [
+    "src/engine/vule-engine.ts",
+    "src/engine/uvrs.ts",
+    "src/engine/dimensions/registry.ts",
+    "src/engine/dimensions/base.ts",
+    "src/engine/cpg/index.ts",
+    "src/engine/vule-config.ts",
+    "src/engine/vule-report.ts",
+    "src/detection/llm-agent.ts",
+    "src/visualization/html-report.ts",
+    "src/integration/vule-cli.ts",
+    "src/utils/logger.ts",
+    "src/utils/metrics.ts",
+    "src/utils/tracing.ts",
+    "src/utils/health.ts"
+  ],
+  "entryPointStrategy": "expand",
+  "out": "docs/api",
+  "tsconfig": "tsconfig.json",
+  "exclude": [
+    "**/node_modules/**",
+    "**/test/**",
+    "**/*.test.ts",
+    "**/*.spec.ts"
+  ],
+  "excludePrivate": true,
+  "excludeInternal": true,
+  "excludeExternals": true,
+  "githubPages": false,
+  "categorizeByGroup": true,
+  "navigation": {
+    "includeCategories": true,
+    "includeGroups": true
+  },
+  "sort": ["source-order"],
+  "treatWarningsAsErrors": false,
+  "skipErrorChecking": true,
+  "readme": "none"
+}

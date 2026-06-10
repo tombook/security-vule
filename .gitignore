@@ -6,6 +6,7 @@ dist/
 sbom.json
 snyk-results.json
 package-lock.json
+docs/api/
 
 # Large data directories (not part of source)
 competitors/
