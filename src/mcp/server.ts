@@ -4,13 +4,24 @@
  * Implements Model Context Protocol (stdio transport) so AI agents
  * can invoke vulnerability detection as a tool.
  *
- * Tools:
- *   scan_code   — Scan code for vulnerabilities
- *   scan_file   — Scan a file path
- *   list_rules  — List all detection rules
- *   lookup_cwe  — Lookup CWE information
+ * Tools (7):
+ *   scan_code           — Scan code for vulnerabilities
+ *   scan_file           — Scan a file path
+ *   list_rules          — List all detection rules
+ *   lookup_cwe          — Lookup CWE information
+ *   threat_model        — Generate STRIDE threat model
+ *   attack_surface      — Enumerate attack surfaces
+ *   owasp_agentic_scan  — Scan code against OWASP Agentic AI Top 10 (2026)
  *
- * Inspired by VulneraMCP's MCP server pattern.
+ * Resources (3):
+ *   rules://catalog       — Full detection rule catalog
+ *   agentic://top10       — OWASP Agentic Top 10 (2026) entries
+ *   security-vule://stats — Project metadata + test/coverage stats
+ *
+ * Prompts (1):
+ *   security-review — Multi-step guided review workflow
+ *
+ * Inspired by VulneraMCP's MCP server pattern + agent-audit MCP integration.
  */
 
 import { detectPattern, ALL_RULES, type PatternMatch } from '../detection/patterns.js';
@@ -21,6 +32,11 @@ import { buildProgramGraph } from '../engine/program-graph.js';
 import { buildCFG } from '../engine/cfg.js';
 import { analyzeTaint } from '../engine/taint.js';
 import { parse, type Language } from '../engine/parser.js';
+import {
+  evaluateOwaspAgenticTop10,
+  listOwaspAgenticTop10,
+  type OwaspAgenticMatch,
+} from '../llm/owasp-agentic.js';
 
 interface MCPRequest {
   jsonrpc: '2.0';
@@ -45,14 +61,21 @@ interface ToolDef {
 const TOOLS: ToolDef[] = [
   {
     name: 'scan_code',
-    description: 'Scan source code for security vulnerabilities. Returns detected issues with line-level precision.',
+    description:
+      'Scan source code for security vulnerabilities. Returns detected issues with line-level precision.',
     inputSchema: {
       type: 'object',
       properties: {
         code: { type: 'string', description: 'Source code to scan' },
-        language: { type: 'string', description: 'Programming language hint (e.g. javascript, python, c)' },
+        language: {
+          type: 'string',
+          description: 'Programming language hint (e.g. javascript, python, c)',
+        },
         filePath: { type: 'string', description: 'Optional file path for location reporting' },
-        minConfidence: { type: 'number', description: 'Minimum confidence threshold (0-1, default 0.3)' },
+        minConfidence: {
+          type: 'number',
+          description: 'Minimum confidence threshold (0-1, default 0.3)',
+        },
       },
       required: ['code'],
     },
@@ -64,7 +87,10 @@ const TOOLS: ToolDef[] = [
       type: 'object',
       properties: {
         path: { type: 'string', description: 'Absolute file path to scan' },
-        minConfidence: { type: 'number', description: 'Minimum confidence threshold (0-1, default 0.3)' },
+        minConfidence: {
+          type: 'number',
+          description: 'Minimum confidence threshold (0-1, default 0.3)',
+        },
       },
       required: ['path'],
     },
@@ -75,8 +101,14 @@ const TOOLS: ToolDef[] = [
     inputSchema: {
       type: 'object',
       properties: {
-        category: { type: 'string', description: 'Filter by category: injection, auth, crypto, race, mem' },
-        severity: { type: 'string', description: 'Filter by severity: critical, high, medium, low, info' },
+        category: {
+          type: 'string',
+          description: 'Filter by category: injection, auth, crypto, race, mem',
+        },
+        severity: {
+          type: 'string',
+          description: 'Filter by severity: critical, high, medium, low, info',
+        },
       },
     },
   },
@@ -93,12 +125,16 @@ const TOOLS: ToolDef[] = [
   },
   {
     name: 'threat_model',
-    description: 'Generate a STRIDE threat model from source code. Identifies trust boundaries, attack surfaces, and categorized threats with risk priorities.',
+    description:
+      'Generate a STRIDE threat model from source code. Identifies trust boundaries, attack surfaces, and categorized threats with risk priorities.',
     inputSchema: {
       type: 'object',
       properties: {
         code: { type: 'string', description: 'Source code to analyze' },
-        language: { type: 'string', description: 'Programming language (javascript, python, c, go, java)' },
+        language: {
+          type: 'string',
+          description: 'Programming language (javascript, python, c, go, java)',
+        },
         filePath: { type: 'string', description: 'File path for scope identification' },
       },
       required: ['code'],
@@ -106,16 +142,75 @@ const TOOLS: ToolDef[] = [
   },
   {
     name: 'attack_surface',
-    description: 'Enumerate attack surfaces from source code. Shows entry points, data flow paths crossing trust boundaries, and risk scores.',
+    description:
+      'Enumerate attack surfaces from source code. Shows entry points, data flow paths crossing trust boundaries, and risk scores.',
     inputSchema: {
       type: 'object',
       properties: {
         code: { type: 'string', description: 'Source code to analyze' },
         language: { type: 'string', description: 'Programming language' },
-        minRisk: { type: 'number', description: 'Minimum risk score to include (0-100, default 30)' },
+        minRisk: {
+          type: 'number',
+          description: 'Minimum risk score to include (0-100, default 30)',
+        },
       },
       required: ['code'],
     },
+  },
+  {
+    name: 'owasp_agentic_scan',
+    description:
+      'Scan source code against the OWASP Agentic AI Top 10 (2026): ASI01..ASI10. Detects agent goal hijack, tool misuse, identity abuse, supply chain, RCE, memory poisoning, and more.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        code: { type: 'string', description: 'Source code to scan' },
+        language: { type: 'string', description: 'Language hint (php, python, javascript, etc.)' },
+        minScore: {
+          type: 'number',
+          description: 'Minimum normalized score to include (0-1, default 0.1)',
+        },
+      },
+      required: ['code'],
+    },
+  },
+];
+
+const RESOURCES: Array<{ uri: string; name: string; description: string; mimeType: string }> = [
+  {
+    uri: 'security-vule://rules',
+    name: 'Detection Rule Catalog',
+    description: `Full list of ${ALL_RULES.length} detection rules with CWE mappings.`,
+    mimeType: 'application/json',
+  },
+  {
+    uri: 'agentic://top10',
+    name: 'OWASP Agentic AI Top 10 (2026)',
+    description: 'OWASP Agentic Security Initiative ASI01..ASI10 with patterns and remediation.',
+    mimeType: 'application/json',
+  },
+  {
+    uri: 'security-vule://stats',
+    name: 'Project Stats',
+    description:
+      'security-vule v1.0.0 metadata: 820 tests, 73% coverage, 29 cosmic-galaxy dimensions.',
+    mimeType: 'application/json',
+  },
+];
+
+const PROMPTS: Array<{
+  name: string;
+  description: string;
+  arguments: Array<{ name: string; description: string; required: boolean }>;
+}> = [
+  {
+    name: 'security-review',
+    description:
+      'Multi-step guided security review: 1) run threat_model, 2) scan_code, 3) owasp_agentic_scan, 4) attack_surface.',
+    arguments: [
+      { name: 'code', description: 'Source code to review', required: true },
+      { name: 'language', description: 'Programming language', required: false },
+    ],
   },
 ];
 
@@ -168,7 +263,8 @@ export class MCPServer {
 
     if (method === 'initialize') {
       return {
-        jsonrpc: '2.0', id,
+        jsonrpc: '2.0',
+        id,
         result: {
           protocolVersion: '2024-11-05',
           capabilities: { tools: { listChanged: false } },
@@ -191,23 +287,152 @@ export class MCPServer {
       return { jsonrpc: '2.0', id, result: await this.callTool(toolName, args) };
     }
 
+    if (method === 'resources/list') {
+      return { jsonrpc: '2.0', id, result: { resources: RESOURCES } };
+    }
+
+    if (method === 'resources/read') {
+      const uri = params?.uri as string;
+      try {
+        return { jsonrpc: '2.0', id, result: this.readResource(uri) };
+      } catch (e) {
+        return { jsonrpc: '2.0', id, error: { code: -32002, message: (e as Error).message } };
+      }
+    }
+
+    if (method === 'prompts/list') {
+      return { jsonrpc: '2.0', id, result: { prompts: PROMPTS } };
+    }
+
+    if (method === 'prompts/get') {
+      const promptName = params?.name as string;
+      const args = (params?.arguments ?? {}) as Record<string, unknown>;
+      return { jsonrpc: '2.0', id, result: this.getPrompt(promptName, args) };
+    }
+
     return { jsonrpc: '2.0', id, error: { code: -32601, message: `Method not found: ${method}` } };
   }
 
-  private async callTool(name: string, args: Record<string, unknown>): Promise<{ content: Array<{ type: string; text: string }> }> {
+  private readResource(uri: string): {
+    contents: Array<{ uri: string; mimeType: string; text: string }>;
+  } {
+    if (uri === 'security-vule://rules') {
+      return {
+        contents: [
+          {
+            uri,
+            mimeType: 'application/json',
+            text: JSON.stringify(
+              ALL_RULES.map((r) => ({
+                rule_id: r.rule_id,
+                name: r.name,
+                severity: r.severity,
+                cwe: r.cwe,
+                description: r.description,
+              })),
+              null,
+              2
+            ),
+          },
+        ],
+      };
+    }
+    if (uri === 'agentic://top10') {
+      return {
+        contents: [
+          {
+            uri,
+            mimeType: 'application/json',
+            text: JSON.stringify(listOwaspAgenticTop10(), null, 2),
+          },
+        ],
+      };
+    }
+    if (uri === 'security-vule://stats') {
+      return {
+        contents: [
+          {
+            uri,
+            mimeType: 'application/json',
+            text: JSON.stringify(
+              {
+                name: 'security-vule',
+                version: '1.0.0',
+                dimensions: 29,
+                rules: ALL_RULES.length,
+                owaspAgenticTop10: 10,
+                tests: 820,
+                coverage: '73.02%',
+                license: 'AGPL-3.0',
+              },
+              null,
+              2
+            ),
+          },
+        ],
+      };
+    }
+    throw new Error(`Unknown resource URI: ${uri}`);
+  }
+
+  private getPrompt(
+    name: string,
+    args: Record<string, unknown>
+  ): { messages: Array<{ role: string; content: { type: string; text: string } }> } {
+    if (name === 'security-review') {
+      const code = (args.code as string) ?? '';
+      const lang = (args.language as string) ?? 'auto';
+      const text = `Perform a comprehensive security review of the following ${lang} code:
+
+\`\`\`
+${code}
+\`\`\`
+
+Steps (run each in order):
+1. Call tool \`threat_model\` with the code to get STRIDE categories + risk score.
+2. Call tool \`scan_code\` to find CWE-mapped vulnerabilities.
+3. Call tool \`owasp_agentic_scan\` to detect agentic AI risks (ASI01..ASI10).
+4. Call tool \`attack_surface\` to enumerate trust-boundary crossings.
+5. Summarize findings: top 5 issues ranked by UVRS-equivalent severity, with concrete fixes.`;
+      return {
+        messages: [
+          {
+            role: 'user',
+            content: { type: 'text', text },
+          },
+        ],
+      };
+    }
+    throw new Error(`Unknown prompt: ${name}`);
+  }
+
+  private async callTool(
+    name: string,
+    args: Record<string, unknown>
+  ): Promise<{ content: Array<{ type: string; text: string }> }> {
     switch (name) {
-      case 'scan_code': return this.scanCode(args);
-      case 'scan_file': return this.scanFile(args);
-      case 'list_rules': return this.listRules(args);
-      case 'lookup_cwe': return this.lookupCwe(args);
-      case 'threat_model': return this.threatModel(args);
-      case 'attack_surface': return this.attackSurface(args);
+      case 'scan_code':
+        return this.scanCode(args);
+      case 'scan_file':
+        return this.scanFile(args);
+      case 'list_rules':
+        return this.listRules(args);
+      case 'lookup_cwe':
+        return this.lookupCwe(args);
+      case 'threat_model':
+        return this.threatModel(args);
+      case 'attack_surface':
+        return this.attackSurface(args);
+      case 'owasp_agentic_scan':
+        return this.owaspAgenticScan(args);
       default:
         return { content: [{ type: 'text', text: `Unknown tool: ${name}` }] };
     }
   }
 
-  private scanCode(args: Record<string, unknown>): { content: Array<{ type: string; text: string }> } {
+  private scanCode(args: Record<string, unknown>): {
+    content: Array<{ type: string; text: string }>;
+  } {
     const code = args.code as string;
     const filePath = args.filePath as string | undefined;
     const language = args.language as string | undefined;
@@ -215,7 +440,7 @@ export class MCPServer {
 
     const matches = detectPattern(code, filePath);
     const located = locateLines(
-      matches.map(m => ({
+      matches.map((m) => ({
         ruleId: m.rule_id,
         name: m.name,
         severity: m.severity,
@@ -227,32 +452,43 @@ export class MCPServer {
         message: m.message,
       })),
       code,
-      filePath,
+      filePath
     );
 
-    const filtered = located.filter(d => d.confidence >= minConf);
+    const filtered = located.filter((d) => d.confidence >= minConf);
 
     if (filtered.length === 0) {
       return { content: [{ type: 'text', text: 'No vulnerabilities detected.' }] };
     }
 
     const lines = code.split('\n');
-    const report = filtered.map(d => {
+    const report = filtered.map((d) => {
       const loc = d.lineLocation;
       const locStr = loc ? `:${loc.startLine}-${loc.endLine}` : '';
       let snippet = '';
       if (loc) {
         const start = Math.max(0, loc.startLine - 1);
         const end = Math.min(lines.length, loc.endLine);
-        snippet = '\n' + lines.slice(start, end).map((l, i) => `  ${start + i + 1}: ${l}`).join('\n');
+        snippet =
+          '\n' +
+          lines
+            .slice(start, end)
+            .map((l, i) => `  ${start + i + 1}: ${l}`)
+            .join('\n');
       }
       return `[${d.severity.toUpperCase()}] ${d.name} (${d.ruleId})${locStr}\n  Confidence: ${(d.confidence * 100).toFixed(0)}%${d.cwe ? ` | CWE: ${d.cwe.join(', ')}` : ''}${snippet}`;
     });
 
-    return { content: [{ type: 'text', text: `Found ${filtered.length} issue(s):\n\n${report.join('\n\n')}` }] };
+    return {
+      content: [
+        { type: 'text', text: `Found ${filtered.length} issue(s):\n\n${report.join('\n\n')}` },
+      ],
+    };
   }
 
-  private scanFile(args: Record<string, unknown>): { content: Array<{ type: string; text: string }> } {
+  private scanFile(args: Record<string, unknown>): {
+    content: Array<{ type: string; text: string }>;
+  } {
     const path = args.path as string;
     try {
       const fs = require('fs');
@@ -263,47 +499,78 @@ export class MCPServer {
     }
   }
 
-  private listRules(args: Record<string, unknown>): { content: Array<{ type: string; text: string }> } {
+  private listRules(args: Record<string, unknown>): {
+    content: Array<{ type: string; text: string }>;
+  } {
     let rules = ALL_RULES;
     const category = args.category as string | undefined;
     const severity = args.severity as string | undefined;
 
     if (category) {
-      const prefix = category === 'injection' ? 'INJ' : category === 'auth' ? 'AUTH' : category === 'crypto' ? 'CRYPTO' : category === 'race' ? 'RACE' : 'MEM';
-      rules = rules.filter(r => r.rule_id.startsWith(prefix));
+      const prefix =
+        category === 'injection'
+          ? 'INJ'
+          : category === 'auth'
+            ? 'AUTH'
+            : category === 'crypto'
+              ? 'CRYPTO'
+              : category === 'race'
+                ? 'RACE'
+                : 'MEM';
+      rules = rules.filter((r) => r.rule_id.startsWith(prefix));
     }
     if (severity) {
-      rules = rules.filter(r => r.severity === severity);
+      rules = rules.filter((r) => r.severity === severity);
     }
 
-    const text = rules.map(r =>
-      `${r.rule_id}: ${r.name} [${r.severity}] (${r.cwe?.join(', ') ?? 'N/A'}) - ${r.description}`
-    ).join('\n');
+    const text = rules
+      .map(
+        (r) =>
+          `${r.rule_id}: ${r.name} [${r.severity}] (${r.cwe?.join(', ') ?? 'N/A'}) - ${r.description}`
+      )
+      .join('\n');
 
     return { content: [{ type: 'text', text: `${rules.length} rules:\n${text}` }] };
   }
 
-  private lookupCwe(args: Record<string, unknown>): { content: Array<{ type: string; text: string }> } {
+  private lookupCwe(args: Record<string, unknown>): {
+    content: Array<{ type: string; text: string }>;
+  } {
     const cwe = args.cwe as string | undefined;
     const query = args.query as string | undefined;
 
     if (cwe) {
       const entries = kb.lookupCwe(cwe);
       if (entries.length > 0) {
-        return { content: [{ type: 'text', text: entries.map(e => `${e.id}: ${e.content}`).join('\n\n') }] };
+        return {
+          content: [
+            { type: 'text', text: entries.map((e) => `${e.id}: ${e.content}`).join('\n\n') },
+          ],
+        };
       }
       return { content: [{ type: 'text', text: `No entry found for ${cwe}` }] };
     }
 
     if (query) {
       const results = kb.search(query, 5);
-      return { content: [{ type: 'text', text: results.map(r => `${r.entry.id} (${(r.score * 100).toFixed(0)}%): ${r.entry.content}`).join('\n\n') }] };
+      return {
+        content: [
+          {
+            type: 'text',
+            text: results
+              .map((r) => `${r.entry.id} (${(r.score * 100).toFixed(0)}%): ${r.entry.content}`)
+              .join('\n\n'),
+          },
+        ],
+      };
     }
 
     return { content: [{ type: 'text', text: 'Provide either cwe or query parameter.' }] };
   }
 
-  private threatModel(args: Record<string, unknown>): { content: Array<{ type: string; text: string }> } {
+  private threatModel(args: Record<string, unknown>): {
+    content: Array<{ type: string; text: string }>;
+  } {
     const code = args.code as string;
     const filePath = (args.filePath as string) ?? 'input';
     const langHint = args.language as string | undefined;
@@ -315,12 +582,13 @@ export class MCPServer {
     const taint = analyzeTaint(code, filePath);
     const model = generateThreatModel(graph, taint, filePath);
 
-    const threats = model.threats.map(t =>
-      `[${t.priority}] ${t.category.toUpperCase()} — ${t.title}\n    CWE: ${t.cwe?.join(', ') ?? 'N/A'} | OWASP: ${t.owasp ?? 'N/A'}\n    Detection rules: ${t.suggestedDetectionRules.join(', ')}`,
+    const threats = model.threats.map(
+      (t) =>
+        `[${t.priority}] ${t.category.toUpperCase()} — ${t.title}\n    CWE: ${t.cwe?.join(', ') ?? 'N/A'} | OWASP: ${t.owasp ?? 'N/A'}\n    Detection rules: ${t.suggestedDetectionRules.join(', ')}`
     );
 
-    const surfaces = model.attackSurfaces.map(s =>
-      `${s.entryPoint} (risk: ${s.riskScore}) — ${s.dataFlowPaths.length} flow paths`,
+    const surfaces = model.attackSurfaces.map(
+      (s) => `${s.entryPoint} (risk: ${s.riskScore}) — ${s.dataFlowPaths.length} flow paths`
     );
 
     const report = [
@@ -332,8 +600,7 @@ export class MCPServer {
       `Threats: ${model.threats.length}`,
       ``,
       `STRIDE Coverage:`,
-      ...Object.entries(model.strideCoverage)
-        .map(([k, v]) => `  ${k}: ${v ? 'YES' : 'no'}`),
+      ...Object.entries(model.strideCoverage).map(([k, v]) => `  ${k}: ${v ? 'YES' : 'no'}`),
       ``,
       `Risk Assessment: ${model.riskAssessment.overall}/100`,
       ...Object.entries(model.riskAssessment.byCategory)
@@ -351,7 +618,9 @@ export class MCPServer {
     return { content: [{ type: 'text', text: report.join('\n') }] };
   }
 
-  private attackSurface(args: Record<string, unknown>): { content: Array<{ type: string; text: string }> } {
+  private attackSurface(args: Record<string, unknown>): {
+    content: Array<{ type: string; text: string }>;
+  } {
     const code = args.code as string;
     const langHint = args.language as string | undefined;
     const minRisk = (args.minRisk as number) ?? 30;
@@ -364,17 +633,19 @@ export class MCPServer {
     const model = generateThreatModel(graph, taint, 'input');
 
     const surfaces = model.attackSurfaces
-      .filter(s => s.riskScore >= minRisk)
+      .filter((s) => s.riskScore >= minRisk)
       .sort((a, b) => b.riskScore - a.riskScore);
 
     if (surfaces.length === 0) {
-      return { content: [{ type: 'text', text: `No attack surfaces with risk >= ${minRisk} found.` }] };
+      return {
+        content: [{ type: 'text', text: `No attack surfaces with risk >= ${minRisk} found.` }],
+      };
     }
 
-    const report = surfaces.map(s => {
-      const paths = s.dataFlowPaths.slice(0, 3).map(p =>
-        `    ${p.source} → ${p.sink} (${p.confidence})`,
-      );
+    const report = surfaces.map((s) => {
+      const paths = s.dataFlowPaths
+        .slice(0, 3)
+        .map((p) => `    ${p.source} → ${p.sink} (${p.confidence})`);
       return [
         `Entry: ${s.entryPoint} (${s.entryType}) | Risk: ${s.riskScore}/100`,
         `  Boundaries crossed: ${s.boundariesCrossed.length}`,
@@ -383,7 +654,68 @@ export class MCPServer {
       ].join('\n');
     });
 
-    return { content: [{ type: 'text', text: `${surfaces.length} attack surface(s) (risk >= ${minRisk}):\n\n${report.join('\n\n')}` }] };
+    return {
+      content: [
+        {
+          type: 'text',
+          text: `${surfaces.length} attack surface(s) (risk >= ${minRisk}):\n\n${report.join('\n\n')}`,
+        },
+      ],
+    };
+  }
+
+  private owaspAgenticScan(args: Record<string, unknown>): {
+    content: Array<{ type: string; text: string }>;
+  } {
+    const code = args.code as string;
+    const lang = (args.language as string) ?? 'auto';
+    const minScore = (args.minScore as number) ?? 0.1;
+
+    const result = evaluateOwaspAgenticTop10(code, lang);
+    const filtered = result.matches.filter((m: OwaspAgenticMatch) => m.normalizedScore >= minScore);
+
+    if (filtered.length === 0) {
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `✅ No OWASP Agentic Top 10 (2026) issues detected. Coverage: ${(result.coverage * 100).toFixed(0)}% of ASI01..ASI10.`,
+          },
+        ],
+      };
+    }
+
+    const lines = code.split('\n');
+    const blocks = filtered.map((m) => {
+      const header = `[${m.entry.severity.toUpperCase()}] ${m.entry.id}: ${m.entry.title}  (score=${m.normalizedScore.toFixed(2)})`;
+      const dims = `  Maps to dimensions: ${m.entry.dimensions.join(', ')}`;
+      const cwe = `  CWE: ${m.entry.cwe}`;
+      const hits = m.matches
+        .map(
+          (h) =>
+            `  • line ${h.line} [${h.pattern}]: ${h.snippet}\n` +
+            `    ${lines
+              .slice(Math.max(0, h.line - 2), Math.min(lines.length, h.line + 1))
+              .map((l, i) => `      ${h.line - 1 + i}: ${l}`)
+              .join('\n')}`
+        )
+        .join('\n');
+      const fix = `  Remediation: ${m.entry.remediation}`;
+      return [header, dims, cwe, hits, fix].join('\n');
+    });
+
+    return {
+      content: [
+        {
+          type: 'text',
+          text:
+            `🌌 OWASP Agentic Top 10 (2026) scan: ${filtered.length} of 10 categories triggered\n` +
+            `Severity: ${result.criticalCount}C / ${result.highCount}H / ${result.mediumCount}M / ${result.lowCount}L\n` +
+            `Total findings: ${result.totalFindings}\n\n` +
+            blocks.join('\n\n---\n\n'),
+        },
+      ],
+    };
   }
 
   private sendResponse(response: MCPResponse): void {
@@ -399,11 +731,25 @@ export async function runMCP(): Promise<void> {
 function detectLangForMcp(filePath: string): Language {
   const ext = filePath.split('.').pop()?.toLowerCase();
   switch (ext) {
-    case 'py': return 'python';
-    case 'js': case 'jsx': case 'ts': case 'tsx': case 'mjs': case 'cjs': return 'javascript';
-    case 'java': return 'java';
-    case 'c': case 'h': case 'cpp': case 'hpp': return 'c';
-    case 'go': return 'go';
-    default: return 'javascript';
+    case 'py':
+      return 'python';
+    case 'js':
+    case 'jsx':
+    case 'ts':
+    case 'tsx':
+    case 'mjs':
+    case 'cjs':
+      return 'javascript';
+    case 'java':
+      return 'java';
+    case 'c':
+    case 'h':
+    case 'cpp':
+    case 'hpp':
+      return 'c';
+    case 'go':
+      return 'go';
+    default:
+      return 'javascript';
   }
 }
