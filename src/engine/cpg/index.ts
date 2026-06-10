@@ -8,5 +8,12 @@
 export * from './types.js';
 export { CPGBuilder, createCPG } from './builder.js';
 export { bfs, dfs, allPaths, downstreamNodes, upstreamNodes } from './queries.js';
-export { computePagerank, computeBetweenness, computeDegreeStats, type DegreeStats } from './metrics.js';
+export {
+  computePagerank,
+  computeBetweenness,
+  computeDegreeStats,
+  type DegreeStats,
+} from './metrics.js';
 export { isSinkFunction, getSinks, type SinkConfig, type SinksByLanguage } from './sinks.js';
+export { query, predicates, VqlQuery } from './vql.js';
+export type { VqlPredicate, VqlOptions, VqlPath, VqlResult } from './vql.js';
