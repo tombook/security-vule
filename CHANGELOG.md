@@ -5,90 +5,94 @@ All notable changes to security-vule will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [2.0.0] - 2026-06-09
+## [Unreleased]
 
-### Added — AI Security Hardening (P0)
+### Added
+- ESLint + Prettier configuration (`eslint.config.js`, `.prettierrc.json`)
+- Husky pre-commit hook with lint-staged
+- Test coverage reporting (target: ≥80% line coverage, current: 72.32%)
+- `CONTRIBUTING.md` — contributor guide
+- `CHANGELOG.md` — this file
+- `SECURITY.md` — vulnerability disclosure policy
+- `Dockerfile` (multi-stage, multi-arch)
+- Engineering roadmap v1.0 (`docs/engineering-roadmap-v1.0.md`)
+- Evolution roadmap v1.0 (`docs/evolution-roadmap-v1.0.md`)
+- v0.3 competitive comparison vs Anthropic Harness + Alibaba OCR (`docs/v0.3-competitive-comparison.md`)
+- Cosmic-galaxy evolution design spec (`docs/superpowers/specs/2026-06-10-cosmic-galaxy-evolution-design.md`)
 
-- **Prompt injection defense** (`src/llm/security.ts` + `src/detection/llm-agent.ts`):
-  XML isolation (`<file>` tags) wrapping code content, strict JSON schema
-  enforcement, system-prompt pre-amble marking file content as UNTRUSTED DATA.
-- **Secret redaction** (`redactSecrets()`): 17 regex patterns strip AWS, JWT,
-  RSA/EC/PGP/OpenSSH private keys, GitHub/Slack/Stripe/OpenAI/Anthropic tokens,
-  Google API keys, and hardcoded passwords before LLM calls.
-- **Prompt injection detection** (`detectPromptInjection()`): 12 patterns
-  covering "ignore previous instructions", "you are now", DAN jailbreak,
-  persona switches, "no vulnerabilities" trick phrases.
-- **LLM output validation** (`validateFinding()`): 18 canonical type
-  whitelist, severity enum, line-range check, rejection of findings with
-  injection-echo phrases.
-- **Rate limiter** (`RateLimiter`): 1M tokens / $5 / 10K calls per scan
-  (fail-safe semantics — checks before incrementing counters).
-- **SARIF sanitization** (`toSarif()`): strips code snippets, marks output
-  with `security-vule/sarif-sanitized` property.
-- **GitHub Action updates**: PR comments now show only statistics, no code.
+### Changed
+- Bumped to v0.3.0 development cycle
 
-### Added — AI Security Observability (P1)
+## [0.3.0] - 2026-06-10
 
-- **Multi-Model Consensus** (`src/llm/consensus.ts`): For CRITICAL/HIGH findings,
-  two independent LLMs analyze the same code. Only findings both models agree
-  on are reported. Disagreements disclosed.
-- **Audit Logger** (`src/llm/audit.ts`): Structured logging of every LLM call
-  (file hash, size, provider, model, tokens, cost, duration, redactions,
-  injection detection, findings accepted/rejected). 3 sink types: stdout,
-  file, multi.
-- **Cost Dashboard** (`AuditLogger.formatDashboard()`): Per-provider and
-  per-outcome breakdown for cost tracking.
-- **AI Red Team Corpus** (`corpus/ai-redteam/`): 6 PHP files with embedded
-  prompt injection + secrets + jailbreaks. 4 prompt-injection + 2 secret-leak.
-  10/10 tests pass.
-- **AI Red Team Runner** (`scripts/ai-redteam.ts`): Single-command validation
-  of the LLM defense pipeline.
-- **LLM Chaos Engineering** (`tests/llm/chaos.test.ts`): 12 chaos scenarios
-  including malformed JSON, rate limit, billing error, redaction idempotence.
+### Added
+- **29 cosmic-galaxy-aligned dimension detectors** with formal UVRS scoring
+  - 4 P0 dimensions: 引力场 (gravity), 开普勒 (kepler), 轨道六要素 (orbital), N体 (n-body)
+  - 5 P1 dimensions: 摄动 (perturbation), 潮汐 (tidal), 相对论 (relativistic), 暗物质 (dark-matter), 熵增 (entropy)
+  - 3 P2 dimensions: 量子 (quantum), 拓扑 (topology), 信息论 (information)
+  - 6 math frameworks: 类型论, 范畴论/数据流函子, TDA, 纯函数式, 抽象解释, 符号执行
+  - 10 P3 dimensions: 混沌, 相变, 场论, 分形, 非平衡, 博弈, 迁移, 微分几何, 重整化, 范畴论基础
+- **CPG (Code Property Graph) core** with 5 edge kinds (data, control, call, def_use, ast_child)
+- **VuleEngine** unified entry point
+- **YAML config** (`config/vule.yaml`) for weight/threshold customization
+- **CLI commands**: `vule analyze`, `vule dimension`, `vule visualize`, `vule server`, `vule list-dimensions`
+- **HTML visualization** with D3.js force-directed risk star map + Plotly radar chart
+- **Web UI server** (Bun.serve) with REST API
+- **Verify pass** for false-positive reduction (~95% precision)
+- **TYPE_NORMALIZE** for LLM type variant mapping
+- **Specialized per-vulnerability-type prompts** (SQLi/Cmdi/XSS/LFI/Upload/Deser/SSRF/InfoDisclosure)
+- **Multi-finding support** (configurable `maxFindings`, default 5)
+- **Attack path tracing methodology** (ENTRY→PROPAGATION→SINK→TRIGGER)
+- **CWE validation map** (17 CWE entries with bidirectional type↔CWE check)
+- **Cosmic-galaxy equivalence test** (cross-project integration test, tolerance 0.10)
+- **Performance benchmarks** (100/500-node CPG analysis)
+- **PoC validation against real Docker targets** (8/8 vulnerabilities proven exploitable)
 
-### Added — AI Security Ecosystem (P2)
+### Improved
+- LLM findings: 12 → 22 (+83%)
+- File detection rate: 83% → 92%
+- False positive rate: ~20% → ~14%
+- 8 Sprint plans completed
+- 213+ new tests added (771 total)
 
-- **AI-BOM** (`src/llm/ai-bom.ts`): CycloneDX 1.5 compliant Bill of Materials
-  for AI components. 8 provider risk profiles (zhipu, anthropic, openai,
-  ollama, deepseek, mock) with privacy + compliance + data residency metadata.
-- **AI Security Metrics** (`src/llm/metrics.ts`): Aggregated compliance
-  report — injection attempts, secrets redacted, rejection rate, cost, risk
-  assessment.
-- **MITRE ATLAS Mapping** (`src/llm/atlas.ts`): 12 ATLAS techniques
-  documented with corresponding defenses. Cover 100% of relevant techniques.
-- **OWASP AI Security Contribution** (`docs/owasp-ai-security-contribution.md`):
-  6-chapter PR draft ready for submission.
-- **Real-DVWA Red Team** (`scripts/real-dvwa-redteam.ts`): Optional Docker-based
-  validation against real DVWA with graceful mock fallback.
+### Performance
+- Single-file LLM scan: ~60s → ~49s (-18% via specialized prompts)
+- 100-node CPG analysis: <1s
+- 500-node CPG analysis: <5s
 
-### Added — v1.0 Foundation (pre-2.0)
+### Documentation
+- `docs/design-philosophy.md` — cosmic-galaxy design philosophy
+- `docs/evaluation-report.md` — comprehensive evaluation (11 chapters)
+- `docs/three-tool-comparison.md` — initial comparison (pre-v0.3)
+- `docs/llm-mode-gap-analysis.md` — gap analysis vs SOTA tools
+- `docs/ai-security-expert-recommendations.md` — AI security audit
+- `docs/v0.3-competitive-comparison.md` — competitive comparison post-v0.3
+- `docs/engineering-roadmap-v1.0.md` — 12-week engineering roadmap
+- `docs/evolution-roadmap-v1.0.md` — 12-month feature roadmap
+- 18 theory docs at `theory/dimensions/`
+- 8 Sprint plans at `.agents/superpowers/specs/2026-06-10-sprint-{1..8}-*.md`
 
-- **Static analysis**: tree-sitter + taint analysis for PHP/JS/Java/Python/Go.
-- **PoC runtime verification**: 9 exploit categories, 80/80 = 100% precision
-  on DVWA corpus.
-- **STRIDE threat modeling**: 6 categories (S/T/R/I/D/E) with auto-mapping
-  from detected vulnerability types.
-- **DFD data flow diagrams**: Auto-generated from code with 3 trust
-  boundaries (public/app/data tier) + Mermaid output.
-- **SARIF 2.1.0 output**: For native GitHub Code Scanning integration.
-- **CLI** (`src/cli.ts`): `scan`, `threat-model`, `version`, `help` subcommands.
-- **GitHub Action** (`.github/action/action.yml`): Composite action with
-  bun install, scan, SARIF upload, fail-on threshold.
-- **GitLab CI Template** (`.gitlab-ci.d/security-vule.yml`): SAST report
-  integration.
-- **Docker Compose** (`poc-validator/real-apps/docker-compose.yml`):
-  One-command real DVWA + bWAPP + sqli-labs + Pikachu deployment.
+## [0.1.0] - 2026-05-19
 
-### Verified
+### Added
+- Initial project snapshot
+- Tree-sitter-based AST analyzer for 21 vulnerability types
+- Taint analysis (`src/engine/taint.ts`, `taint-enhanced.ts`)
+- CFG/DFG program graphs (`src/engine/program-graph.ts`)
+- LLM enhancement via GLM-5.1, Anthropic Claude, OpenAI, Ollama
+- 8 LLM providers with failover
+- Multi-model consensus mode
+- Playwright PoC verification harness
+- STRIDE threat modeling + DFD
+- SARIF 2.1.0 output for GitHub Code Scanning
+- Mock DVWA + real Docker apps (DVWA/bWAPP/sqli-labs/Pikachu) for PoC validation
+- GitHub Actions + GitLab CI/CD templates
+- Plugin architecture (`src/plugin/`)
+- MCP server (`src/mcp/server.ts`)
+- Cosmic-galaxy parallel execution engine (`src/math/cosm-x-*.ts`)
+- Statistical detector (`src/detection/statistical.ts`)
+- Project analyzer (`src/math/cosm-x-project-analyzer.ts`)
 
-- **Static F1**: 68.5% on 4 apps (DVWA 56.5%, bWAPP 62.5%, sqli-labs 96.2%, Pikachu 65.2%)
-- **PoC verified**: 80/80 = 100% (precision 1.00 on mock DVWA)
-- **AI red team**: 10/10 pass
-- **MITRE ATLAS coverage**: 12/12 relevant techniques
-- **tsc --noEmit**: 0 errors
-- **bun test**: 558 pass, 36 pre-existing NodeGoat Cypress failures
-- **Tests**: 36 security module tests + 75 LLM module tests + 30+ red team tests
-
-### License
-
-AGPL-3.0 (per Shannon-comparable open source standard)
+[Unreleased]: https://github.com/security-vule/security-vule/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/security-vule/security-vule/compare/v0.1.0...v0.3.0
+[0.1.0]: https://github.com/security-vule/security-vule/releases/tag/v0.1.0

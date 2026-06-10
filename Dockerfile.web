@@ -1,0 +1,13 @@
+# security-vule Web UI Server
+FROM oven/bun:1-slim
+WORKDIR /app
+COPY --from=builder /app/dist /app/dist
+COPY --from=builder /app/node_modules /app/node_modules
+COPY --from=builder /app/config /app/config
+COPY --from=builder /app/theory /app/theory
+COPY --from=builder /app/src/integration /app/src/integration
+EXPOSE 3000
+USER bun
+HEALTHCHECK --interval=30s --timeout=3s \
+  CMD bun --bun src/integration/commands/server.ts --port 3000 & sleep 2 && curl -fsS http://localhost:3000/api/health || exit 1
+CMD ["bun", "--bun", "src/integration/commands/server.ts", "--port", "3000"]

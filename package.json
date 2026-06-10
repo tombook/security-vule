@@ -11,8 +11,24 @@
     "evolve": "bun --bun src/evolution/evolver.ts",
     "evolve-enhanced": "bun --bun src/evolution/run-evolution-enhanced.ts",
     "test": "bun test",
+    "test:watch": "bun test --watch",
+    "test:cov": "bun test --coverage",
+    "lint": "eslint 'src/**/*.ts' 'tests/**/*.ts'",
+    "lint:fix": "eslint 'src/**/*.ts' 'tests/**/*.ts' --fix",
+    "format": "prettier --write 'src/**/*.ts' 'tests/**/*.ts'",
+    "format:check": "prettier --check 'src/**/*.ts' 'tests/**/*.ts'",
     "bench": "bun --bun src/integration/benchmark.ts",
-    "benchmark:eval": "bun --bun -e \"import {evaluate,SYNTHETIC_DATASET,formatReport} from './src/benchmark/index.js'; console.log(formatReport(evaluate(SYNTHETIC_DATASET,[])));\""
+    "benchmark:eval": "bun --bun -e \"import {evaluate,SYNTHETIC_DATASET,formatReport} from './src/benchmark/index.js'; console.log(formatReport(evaluate(SYNTHETIC_DATASET,[])));\"",
+    "prepare": "husky"
+  },
+  "lint-staged": {
+    "*.{ts,tsx}": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "*.{json,md,yml,yaml}": [
+      "prettier --write"
+    ]
   },
   "exports": {
     "./plugin": "./src/plugin/index.js",
@@ -33,7 +49,13 @@
   "devDependencies": {
     "@types/bun": "^1.0.0",
     "@types/node": "^25.9.1",
-    "@typescript-eslint/parser": "^8.60.0",
+    "@typescript-eslint/eslint-plugin": "^8.61.0",
+    "@typescript-eslint/parser": "^8.61.0",
+    "eslint": "9",
+    "eslint-config-prettier": "^10.1.8",
+    "husky": "^9.1.7",
+    "lint-staged": "^17.0.7",
+    "prettier": "^3.8.4",
     "typescript": "^6.0.3"
   },
   "trustedDependencies": [

@@ -1,0 +1,64 @@
+# security-vule docker-compose
+# Usage:
+#   export MINIMAX_API_KEY="..."
+#   export ZHIPU_API_KEY="..."
+#   docker compose up
+
+services:
+  # Main CLI - one-shot scanning
+  cli:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: security-vule:0.3
+    volumes:
+      - ./reports:/app/reports
+      - ${TARGET_PATH:-./test-targets}:/app/target:ro
+    environment:
+      - MINIMAX_API_KEY=${MINIMAX_API_KEY:-}
+      - ZHIPU_API_KEY=${ZHIPU_API_KEY:-}
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+    entrypoint: ["bun", "--bun", "dist/vule-cli.js"]
+    command: ["analyze", "/app/target", "--format", "json", "--export", "/app/reports/report.json"]
+    profiles: ["cli"]
+
+  # Web UI Server - long-running
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.web
+    image: security-vule:0.3-web
+    ports:
+      - "3000:3000"
+    environment:
+      - MINIMAX_API_KEY=${MINIMAX_API_KEY:-}
+      - ZHIPU_API_KEY=${ZHIPU_API_KEY:-}
+    volumes:
+      - ./reports:/app/reports
+    restart: unless-stopped
+    profiles: ["web"]
+
+  # Real vulnerable apps (optional - for PoC verification)
+  dvwa:
+    image: vulnerables/web-dvwa:latest
+    ports:
+      - "8080:80"
+    profiles: ["poc"]
+
+  sqli-labs:
+    image: acgpiano/sqli-labs:latest
+    ports:
+      - "8082:80"
+    profiles: ["poc"]
+
+  bwapp:
+    image: raesene/bwapp:latest
+    ports:
+      - "8081:80"
+    profiles: ["poc"]
+
+  pikachu:
+    image: area39/pikachu:latest
+    ports:
+      - "8083:80"
+    profiles: ["poc"]
