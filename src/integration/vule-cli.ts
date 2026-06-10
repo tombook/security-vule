@@ -2,11 +2,11 @@
  * VuleEngine CLI — main entry point.
  * Usage: vule <command> [options]
  */
-import { Command } from 'commander';
-import { analyzeCommand } from './commands/analyze.js';
+import { Command, type OptionValues } from 'commander';
+import { analyzeCommand, type AnalyzeOptions } from './commands/analyze.js';
 import { dimensionCommand } from './commands/dimension.js';
 import { visualizeCommand } from './commands/visualize.js';
-import { serverCommand } from './commands/server.js';
+import { serverCommand, type ServerOptions } from './commands/server.js';
 import { DIMENSIONS } from '../engine/dimensions/registry.js';
 
 const program = new Command();
@@ -23,7 +23,7 @@ program
   .option('-f, --format <fmt>', 'Output format: json | html | markdown', 'json')
   .option('-e, --export <path>', 'Export report to file')
   .option('-d, --dimensions <list>', 'Comma-separated list of dimensions')
-  .action((path: string, opts: any) => analyzeCommand(path, opts));
+  .action((path: string, opts: OptionValues) => analyzeCommand(path, opts as AnalyzeOptions));
 
 program
   .command('dimension <name> <file>')
@@ -39,7 +39,9 @@ program
   .command('server')
   .description('Start web UI server')
   .option('-p, --port <port>', 'Port number', '3000')
-  .action((opts: any) => serverCommand({ port: parseInt(opts.port, 10) }));
+  .action((opts: OptionValues) =>
+    serverCommand({ port: parseInt(opts.port as string, 10) } as ServerOptions)
+  );
 
 program
   .command('list-dimensions')

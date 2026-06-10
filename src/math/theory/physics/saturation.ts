@@ -27,11 +27,11 @@ import type { CosmXResult } from '../../cosm-x-galaxy.js';
  * - composite_100: 0-100 复合×100
  */
 export interface SixDimRawSignals {
-  anomaly_raw: number;        // 0-10
-  perturbation_raw: number;   // 0-10
-  gravity_raw: number;        // 0-10
-  composite: number;          // 0-1
-  composite_100: number;      // 0-100
+  anomaly_raw: number; // 0-10
+  perturbation_raw: number; // 0-10
+  gravity_raw: number; // 0-10
+  composite: number; // 0-1
+  composite_100: number; // 0-100
 }
 
 /**
@@ -41,14 +41,16 @@ export interface SixDimRawSignals {
  * v3 暴露子信号让过滤器做精细过滤.
  */
 export function extractRawSignals(result: CosmXResult): SixDimRawSignals {
-  // CosmXResult 字段 (来自 cosm-x-galaxy.ts):
-  //   - anomalyScore: number
-  //   - perturbationScore: number
-  //   - gravityScore: number
+  // CosmXResult 实际字段 (来自 cosm-x-galaxy.ts):
   //   - vulnerabilityScore: number (0-1 saturated)
-  const a = (result as any).anomalyScore ?? 0;
-  const p = (result as any).perturbationScore ?? 0;
-  const g = (result as any).gravityScore ?? 0;
+  //   - anomalies: OrbitalAnomaly[] (需要聚合)
+  //   - perturbations: Perturbation[] (需要聚合)
+  //   - dependencyGravity: Map (需要聚合)
+  // 注意: anomalyScore/perturbationScore/gravityScore 是旧 v2 字段,
+  // v3 CosmXResult 已重构成数组/Map. 兼容处理: 不存在时取 0.
+  const a: number = (result as unknown as { anomalyScore?: number }).anomalyScore ?? 0;
+  const p: number = (result as unknown as { perturbationScore?: number }).perturbationScore ?? 0;
+  const g: number = (result as unknown as { gravityScore?: number }).gravityScore ?? 0;
   const composite = Math.min(1.0, a * 0.4 + p * 0.3 + g * 0.3);
   return {
     anomaly_raw: a,
@@ -62,11 +64,7 @@ export function extractRawSignals(result: CosmXResult): SixDimRawSignals {
 /**
  * v3 新增: 复合 (纯函数, 方便单点测试)
  */
-export function computeComposite(
-  anomaly: number,
-  perturbation: number,
-  gravity: number
-): number {
+export function computeComposite(anomaly: number, perturbation: number, gravity: number): number {
   return Math.min(1.0, anomaly * 0.4 + perturbation * 0.3 + gravity * 0.3);
 }
 

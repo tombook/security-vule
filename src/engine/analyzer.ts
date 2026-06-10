@@ -38,18 +38,22 @@ export interface VulnerabilityFinding {
   cwe?: string;
 }
 
-export async function analyzeFile(filePath: string, sourceCode: string, language?: string): Promise<AnalysisResult> {
+export async function analyzeFile(
+  filePath: string,
+  sourceCode: string,
+  language?: string
+): Promise<AnalysisResult> {
   const startTime = Date.now();
   const lang: Language = (language as Language) || detectLang(filePath);
-  
+
   // Parse source to AST
   const parsed = parse(sourceCode, lang);
-  
+
   // Build CPG using parsed AST
   const cpgBuilder = new CPGBuilder();
   cpgBuilder.setLanguage(lang).setProjectPath(filePath);
   cpgBuilder.addFile('file_1', filePath, sourceCode);
-  
+
   // Find and add function nodes from AST
   const functions = findNodesByType(parsed.ast, 'function');
   let nodeId = 1;
@@ -68,29 +72,35 @@ export async function analyzeFile(filePath: string, sourceCode: string, language
       }
     }
   }
-  
+
   const cpg = cpgBuilder.build();
-  
+
   // Build CFG from AST
   let cfg: ControlFlowGraph | null = null;
   try {
     cfg = buildCFG(parsed.ast);
-  } catch { /* skip CFG on error */ }
-  
+  } catch {
+    /* skip CFG on error */
+  }
+
   // Build DFG - use first function name
-  const dfg: DataFlowResult | null = functions.length > 0 
-    ? buildDFG({ nodes: cpg.nodes, edges: cpg.edges, metadata: cpg.metadata } as any, functions[0].code || 'main') 
-    : null;
-  
+  const dfg: DataFlowResult | null =
+    functions.length > 0
+      ? buildDFG(
+          { nodes: cpg.nodes, edges: cpg.edges, metadata: cpg.metadata },
+          functions[0].code || 'main'
+        )
+      : null;
+
   // Taint analysis
   const taint = analyzeTaint(sourceCode, filePath, parsed.ast);
-  
+
   // Compute metrics
   const metrics = computeMetrics(sourceCode, parsed, functions);
-  
+
   // Generate vulnerability findings
   const vulnerabilities = generateFindings(taint, metrics, filePath, sourceCode);
-  
+
   return {
     filePath,
     language: lang,
@@ -107,8 +117,15 @@ export async function analyzeFile(filePath: string, sourceCode: string, language
 function detectLang(filePath: string): Language {
   const ext = filePath.split('.').pop()?.toLowerCase();
   const langMap: Record<string, Language> = {
-    py: 'python', js: 'javascript', ts: 'typescript', java: 'java',
-    c: 'c', go: 'go', rs: 'rust', php: 'php', phtml: 'php',
+    py: 'python',
+    js: 'javascript',
+    ts: 'typescript',
+    java: 'java',
+    c: 'c',
+    go: 'go',
+    rs: 'rust',
+    php: 'php',
+    phtml: 'php',
   };
   return langMap[ext || ''] || 'python';
 }
@@ -116,27 +133,35 @@ function detectLang(filePath: string): Language {
 function computeMetrics(code: string, parsed: ParseResult, functions: ASTNode[]): CodeMetrics {
   const loc = code.split('\n').length;
   const funcCount = functions.length;
-  
+
   // Simple complexity estimate based on AST depth
   const depth = nestingDepthFromAST(parsed.ast);
   const cc = estimateCyclomaticComplexity(parsed.ast);
-  const anomalyScore = detectAnomalies([cc, depth, loc / 100, funcCount], 2.5).length > 0 ? 0.7 : 0.2;
-  
-  return { cyclomaticComplexity: cc, nestingDepth: depth, linesOfCode: loc, functionCount: funcCount, anomalyScore };
+  const anomalyScore =
+    detectAnomalies([cc, depth, loc / 100, funcCount], 2.5).length > 0 ? 0.7 : 0.2;
+
+  return {
+    cyclomaticComplexity: cc,
+    nestingDepth: depth,
+    linesOfCode: loc,
+    functionCount: funcCount,
+    anomalyScore,
+  };
 }
 
 function nestingDepthFromAST(node: ASTNode, depth = 0): number {
   if (!node.children || node.children.length === 0) return depth;
-  return Math.max(...node.children.map(c => nestingDepthFromAST(c, depth + 1)));
+  return Math.max(...node.children.map((c) => nestingDepthFromAST(c, depth + 1)));
 }
 
 function estimateCyclomaticComplexity(ast: ASTNode): number {
   // Count decision points in AST
-  const decisionNodes = findNodesByType(ast, 'if').length
-    + findNodesByType(ast, 'while').length
-    + findNodesByType(ast, 'for').length
-    + findNodesByType(ast, 'case').length
-    + findNodesByType(ast, 'catch').length;
+  const decisionNodes =
+    findNodesByType(ast, 'if').length +
+    findNodesByType(ast, 'while').length +
+    findNodesByType(ast, 'for').length +
+    findNodesByType(ast, 'case').length +
+    findNodesByType(ast, 'catch').length;
   return 1 + decisionNodes;
 }
 
@@ -146,10 +171,15 @@ function adjustConfidenceForSafety(path: TaintPath, sourceCode: string): number 
   const lines = sourceCode.split('\n');
   const sinkLine = lines[path.sink.line - 1] || '';
   const surrounding = lines.slice(Math.max(0, path.sink.line - 10), path.sink.line + 2).join('\n');
-  const widerSurrounding = lines.slice(Math.max(0, path.sink.line - 30), path.sink.line + 5).join('\n');
+  const widerSurrounding = lines
+    .slice(Math.max(0, path.sink.line - 30), path.sink.line + 5)
+    .join('\n');
 
   if (path.sink.type === 'securecookie' || path.sink.type === 'secure_cookie') {
-    if (/setSecure\s*\(\s*true\s*\)/.test(surrounding) && /setHttpOnly\s*\(\s*true\s*\)/.test(surrounding)) {
+    if (
+      /setSecure\s*\(\s*true\s*\)/.test(surrounding) &&
+      /setHttpOnly\s*\(\s*true\s*\)/.test(surrounding)
+    ) {
       return path.confidence * 0.1;
     }
   }
@@ -168,26 +198,47 @@ function adjustConfidenceForSafety(path: TaintPath, sourceCode: string): number 
     return path.confidence * 0.4;
   }
 
-  if (/is_numeric\s*\([^)]*\)/.test(widerSurrounding) && (path.sink.type === 'shell' || path.sink.type === 'file_include')) {
+  if (
+    /is_numeric\s*\([^)]*\)/.test(widerSurrounding) &&
+    (path.sink.type === 'shell' || path.sink.type === 'file_include')
+  ) {
     if ((widerSurrounding.match(/is_numeric\s*\(/g) || []).length >= 3) {
       return path.confidence * 0.15;
     }
     return path.confidence * 0.4;
   }
 
-  if (/intval\s*\([^)]*\)|filter_var\s*\([^,]+,\s*FILTER_VALIDATE_(INT|EMAIL|URL|FLOAT|BOOLEAN)/.test(widerSurrounding)) {
-    if (path.sink.type === 'shell' || path.sink.type === 'file_include' || path.sink.type === 'sql' || path.sink.type === 'ssrf') {
+  if (
+    /intval\s*\([^)]*\)|filter_var\s*\([^,]+,\s*FILTER_VALIDATE_(INT|EMAIL|URL|FLOAT|BOOLEAN)/.test(
+      widerSurrounding
+    )
+  ) {
+    if (
+      path.sink.type === 'shell' ||
+      path.sink.type === 'file_include' ||
+      path.sink.type === 'sql' ||
+      path.sink.type === 'ssrf'
+    ) {
       return path.confidence * 0.3;
     }
   }
 
   if (/preg_match\s*\(\s*['"]\/[^'"]*['"]\s*,\s*\$\w+/.test(widerSurrounding)) {
-    if (path.sink.type === 'shell' || path.sink.type === 'file_include' || path.sink.type === 'ssrf' || path.sink.type === 'eval') {
+    if (
+      path.sink.type === 'shell' ||
+      path.sink.type === 'file_include' ||
+      path.sink.type === 'ssrf' ||
+      path.sink.type === 'eval'
+    ) {
       return path.confidence * 0.25;
     }
   }
 
-  if (/mysql_real_escape_string|mysqli_real_escape_string|pg_escape_string|PreparedStatement|\$\w+\s*=\s*['"][^'"]*['"]\s*\.\s*\$/i.test(widerSurrounding)) {
+  if (
+    /mysql_real_escape_string|mysqli_real_escape_string|pg_escape_string|PreparedStatement|\$\w+\s*=\s*['"][^'"]*['"]\s*\.\s*\$/i.test(
+      widerSurrounding
+    )
+  ) {
     if (path.sink.type === 'sql') {
       return path.confidence * 0.3;
     }
@@ -202,9 +253,14 @@ function adjustConfidenceForSafety(path: TaintPath, sourceCode: string): number 
   return path.confidence;
 }
 
-function generateFindings(taint: TaintResult, metrics: CodeMetrics, file: string, sourceCode: string): VulnerabilityFinding[] {
+function generateFindings(
+  taint: TaintResult,
+  metrics: CodeMetrics,
+  file: string,
+  sourceCode: string
+): VulnerabilityFinding[] {
   const findings: VulnerabilityFinding[] = [];
-  
+
   const seen = new Set<string>();
   for (const path of taint.paths) {
     const dedupKey = `${path.sink.type}:${path.sink.line}`;
@@ -225,7 +281,7 @@ function generateFindings(taint: TaintResult, metrics: CodeMetrics, file: string
       cwe: getCWE(path.sink.type),
     });
   }
-  
+
   if (metrics.anomalyScore > 0.6) {
     findings.push({
       id: `VULN-${Date.now()}-${(vulnCounter++).toString(36)}`,
@@ -264,27 +320,125 @@ function dedupByFileAndType(findings: VulnerabilityFinding[]): VulnerabilityFind
 }
 
 const WEAK_PATTERNS: Array<{ type: string; pattern: RegExp; cwe: string; description: string }> = [
-  { type: 'weakrand', pattern: /new\s+java\.util\.Random\s*\(/g, cwe: 'CWE-330', description: 'Use of insecure Random instead of SecureRandom' },
-  { type: 'weakrand', pattern: /java\.util\.Random\s*\(\s*\)\s*\.\s*next[A-Z]\w*\s*\(/g, cwe: 'CWE-330', description: 'Insecure Random.next*() usage' },
-  { type: 'weakrand', pattern: /Math\.random\s*\(\s*\)/g, cwe: 'CWE-330', description: 'Math.random is not cryptographically secure' },
-  { type: 'crypto', pattern: /Cipher\.getInstance\s*\(\s*['"]DES/g, cwe: 'CWE-327', description: 'DES is a broken cipher' },
-  { type: 'crypto', pattern: /MessageDigest\.getInstance\s*\(\s*['"](?:MD5|SHA-?1)['"]/gi, cwe: 'CWE-327', description: 'MD5/SHA1 are weak hash algorithms' },
-  { type: 'crypto', pattern: /KeyGenerator\.getInstance\s*\(\s*['"]DES/gi, cwe: 'CWE-327', description: 'DES key generation' },
-  { type: 'crypto', pattern: /new\s+javax\.crypto\.spec\.SecretKeySpec\s*\([^,]+,\s*['"]AES[^"]*['"],\s*['"]GCM/gi, cwe: 'CWE-327', description: 'AES with insecure mode' },
-  { type: 'hash', pattern: /MessageDigest\.getInstance\s*\(\s*['"](?:MD5|SHA-?1)['"]/gi, cwe: 'CWE-328', description: 'Weak hash algorithm' },
-  { type: 'hash', pattern: /MessageDigest\.getInstance\s*\(\s*['"]MD2|MD4/gi, cwe: 'CWE-328', description: 'Broken MD2/MD4 hash' },
+  {
+    type: 'weakrand',
+    pattern: /new\s+java\.util\.Random\s*\(/g,
+    cwe: 'CWE-330',
+    description: 'Use of insecure Random instead of SecureRandom',
+  },
+  {
+    type: 'weakrand',
+    pattern: /java\.util\.Random\s*\(\s*\)\s*\.\s*next[A-Z]\w*\s*\(/g,
+    cwe: 'CWE-330',
+    description: 'Insecure Random.next*() usage',
+  },
+  {
+    type: 'weakrand',
+    pattern: /Math\.random\s*\(\s*\)/g,
+    cwe: 'CWE-330',
+    description: 'Math.random is not cryptographically secure',
+  },
+  {
+    type: 'crypto',
+    pattern: /Cipher\.getInstance\s*\(\s*['"]DES/g,
+    cwe: 'CWE-327',
+    description: 'DES is a broken cipher',
+  },
+  {
+    type: 'crypto',
+    pattern: /MessageDigest\.getInstance\s*\(\s*['"](?:MD5|SHA-?1)['"]/gi,
+    cwe: 'CWE-327',
+    description: 'MD5/SHA1 are weak hash algorithms',
+  },
+  {
+    type: 'crypto',
+    pattern: /KeyGenerator\.getInstance\s*\(\s*['"]DES/gi,
+    cwe: 'CWE-327',
+    description: 'DES key generation',
+  },
+  {
+    type: 'crypto',
+    pattern: /new\s+javax\.crypto\.spec\.SecretKeySpec\s*\([^,]+,\s*['"]AES[^"]*['"],\s*['"]GCM/gi,
+    cwe: 'CWE-327',
+    description: 'AES with insecure mode',
+  },
+  {
+    type: 'hash',
+    pattern: /MessageDigest\.getInstance\s*\(\s*['"](?:MD5|SHA-?1)['"]/gi,
+    cwe: 'CWE-328',
+    description: 'Weak hash algorithm',
+  },
+  {
+    type: 'hash',
+    pattern: /MessageDigest\.getInstance\s*\(\s*['"]MD2|MD4/gi,
+    cwe: 'CWE-328',
+    description: 'Broken MD2/MD4 hash',
+  },
   { type: 'crypto', pattern: /\bmd5\s*\(/g, cwe: 'CWE-327', description: 'MD5() is a weak hash' },
   { type: 'crypto', pattern: /\bsha1\s*\(/g, cwe: 'CWE-327', description: 'SHA1() is a weak hash' },
-  { type: 'crypto', pattern: /\bcrypt\s*\(\s*['"](?:DES|md5)/gi, cwe: 'CWE-327', description: 'Insecure cipher mode' },
-  { type: 'crypto', pattern: /xor_this\s*\(/g, cwe: 'CWE-327', description: 'XOR is not real encryption' },
-  { type: 'crypto', pattern: /\bxor\s*\(/g, cwe: 'CWE-327', description: 'XOR-based cipher detected' },
-  { type: 'weakrand', pattern: /mt_rand\s*\(/g, cwe: 'CWE-330', description: 'mt_rand is not cryptographically secure' },
-  { type: 'weakrand', pattern: /\brand\s*\(/g, cwe: 'CWE-330', description: 'rand() is not cryptographically secure' },
-  { type: 'weakrand', pattern: /\$_SESSION\[['"]last_session_id['"]\]\+\+/g, cwe: 'CWE-330', description: 'Predictable session ID via increment' },
-  { type: 'xss', pattern: /echo\s+['"][^'"]*['"]\s*\.[\.\s]*\$_(GET|POST|REQUEST|COOKIE|FILES|SERVER)\[/gi, cwe: 'CWE-79', description: 'Echo with user input is XSS' },
-  { type: 'ssrf', pattern: /header\s*\(\s*['"]Location:\s*['"]?\s*\.?\s*\$_(GET|POST|REQUEST|COOKIE|FILES|SERVER)\[/gi, cwe: 'CWE-918', description: 'Open redirect via Location header' },
-  { type: 'shell', pattern: /shell_exec\s*\(\s*['"][^'"]*['"]\s*\.\s*\$_(GET|POST|REQUEST|COOKIE|FILES|SERVER)\[/gi, cwe: 'CWE-78', description: 'shell_exec with concat user input' },
-  { type: 'sql', pattern: /\$GLOBALS\s*\[\s*['"][^'"]*['"]\s*\]\s*->\s*query\s*\(\s*["'][^"']*['"]\s*\.[\.\s]+\$/gi, cwe: 'CWE-89', description: 'PDO->query with string concat' },
+  {
+    type: 'crypto',
+    pattern: /\bcrypt\s*\(\s*['"](?:DES|md5)/gi,
+    cwe: 'CWE-327',
+    description: 'Insecure cipher mode',
+  },
+  {
+    type: 'crypto',
+    pattern: /xor_this\s*\(/g,
+    cwe: 'CWE-327',
+    description: 'XOR is not real encryption',
+  },
+  {
+    type: 'crypto',
+    pattern: /\bxor\s*\(/g,
+    cwe: 'CWE-327',
+    description: 'XOR-based cipher detected',
+  },
+  {
+    type: 'weakrand',
+    pattern: /mt_rand\s*\(/g,
+    cwe: 'CWE-330',
+    description: 'mt_rand is not cryptographically secure',
+  },
+  {
+    type: 'weakrand',
+    pattern: /\brand\s*\(/g,
+    cwe: 'CWE-330',
+    description: 'rand() is not cryptographically secure',
+  },
+  {
+    type: 'weakrand',
+    pattern: /\$_SESSION\[['"]last_session_id['"]\]\+\+/g,
+    cwe: 'CWE-330',
+    description: 'Predictable session ID via increment',
+  },
+  {
+    type: 'xss',
+    pattern: /echo\s+['"][^'"]*['"]\s*\.[\.\s]*\$_(GET|POST|REQUEST|COOKIE|FILES|SERVER)\[/gi,
+    cwe: 'CWE-79',
+    description: 'Echo with user input is XSS',
+  },
+  {
+    type: 'ssrf',
+    pattern:
+      /header\s*\(\s*['"]Location:\s*['"]?\s*\.?\s*\$_(GET|POST|REQUEST|COOKIE|FILES|SERVER)\[/gi,
+    cwe: 'CWE-918',
+    description: 'Open redirect via Location header',
+  },
+  {
+    type: 'shell',
+    pattern:
+      /shell_exec\s*\(\s*['"][^'"]*['"]\s*\.\s*\$_(GET|POST|REQUEST|COOKIE|FILES|SERVER)\[/gi,
+    cwe: 'CWE-78',
+    description: 'shell_exec with concat user input',
+  },
+  {
+    type: 'sql',
+    pattern:
+      /\$GLOBALS\s*\[\s*['"][^'"]*['"]\s*\]\s*->\s*query\s*\(\s*["'][^"']*['"]\s*\.[\.\s]+\$/gi,
+    cwe: 'CWE-89',
+    description: 'PDO->query with string concat',
+  },
 ];
 
 function detectWeakPatterns(code: string, file: string): VulnerabilityFinding[] {
@@ -316,21 +470,43 @@ function detectWeakPatterns(code: string, file: string): VulnerabilityFinding[] 
 
 function getSeverity(sinkType: string): 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL' {
   const severityMap: Record<string, 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL'> = {
-    sql: 'CRITICAL', shell: 'CRITICAL', eval: 'CRITICAL', deserialization: 'HIGH',
-    dynamic_code: 'HIGH', file_write: 'HIGH', network_send: 'MEDIUM',
+    sql: 'CRITICAL',
+    shell: 'CRITICAL',
+    eval: 'CRITICAL',
+    deserialization: 'HIGH',
+    dynamic_code: 'HIGH',
+    file_write: 'HIGH',
+    network_send: 'MEDIUM',
   };
   return severityMap[sinkType] || 'MEDIUM';
 }
 
 function getCWE(sinkType: string): string {
   const cweMap: Record<string, string> = {
-    sql: 'CWE-89', shell: 'CWE-78', eval: 'CWE-95', file_write: 'CWE-73',
-    filewrite: 'CWE-73', file_include: 'CWE-98', file_inclusion: 'CWE-98',
-    network_send: 'CWE-20', deserialization: 'CWE-502', dynamic_code: 'CWE-94',
-    nosql: 'CWE-943', ssrf: 'CWE-918', xss: 'CWE-79', crypto: 'CWE-327',
-    hash: 'CWE-328', weakrand: 'CWE-330', ldap: 'CWE-90', xpath: 'CWE-643',
-    xpathi: 'CWE-643', xxe: 'CWE-611', trustbound: 'CWE-285', trust_bound: 'CWE-285',
-    securecookie: 'CWE-614', secure_cookie: 'CWE-614',
+    sql: 'CWE-89',
+    shell: 'CWE-78',
+    eval: 'CWE-95',
+    file_write: 'CWE-73',
+    filewrite: 'CWE-73',
+    file_include: 'CWE-98',
+    file_inclusion: 'CWE-98',
+    network_send: 'CWE-20',
+    deserialization: 'CWE-502',
+    dynamic_code: 'CWE-94',
+    nosql: 'CWE-943',
+    ssrf: 'CWE-918',
+    xss: 'CWE-79',
+    crypto: 'CWE-327',
+    hash: 'CWE-328',
+    weakrand: 'CWE-330',
+    ldap: 'CWE-90',
+    xpath: 'CWE-643',
+    xpathi: 'CWE-643',
+    xxe: 'CWE-611',
+    trustbound: 'CWE-285',
+    trust_bound: 'CWE-285',
+    securecookie: 'CWE-614',
+    secure_cookie: 'CWE-614',
   };
   return cweMap[sinkType] || 'CWE-707';
 }

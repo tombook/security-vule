@@ -3,6 +3,7 @@
  * Spec: §6 Visualization
  */
 import type { VuleReport, NodeReport } from '../engine/vule-report.js';
+import { RiskLevel } from '../engine/uvrs.js';
 
 export interface StarMapNode {
   id: string;
@@ -19,7 +20,7 @@ export interface StarMapData {
 }
 
 export function buildStarMapData(report: VuleReport): StarMapData {
-  const nodes: StarMapNode[] = report.topRisk.map(n => ({
+  const nodes: StarMapNode[] = report.topRisk.map((n) => ({
     id: n.nodeId,
     label: n.code.slice(0, 30),
     level: n.level,
@@ -41,13 +42,23 @@ export interface RadarData {
 
 export function buildRadarData(node: NodeReport): RadarData {
   const dimensions = Object.keys(node.contributions);
-  const values = dimensions.map(d => node.contributions[d]);
+  const values = dimensions.map((d) => node.contributions[d]);
   return { dimensions, values };
 }
 
 export function generateHTMLReport(report: VuleReport): string {
+  const topNode: NodeReport = report.topRisk[0] ?? {
+    nodeId: '',
+    file: '',
+    line: 0,
+    code: '',
+    uvrs: 0,
+    level: RiskLevel.LOW,
+    dominantDimension: 'none',
+    contributions: {},
+  };
   const starMap = buildStarMapData(report);
-  const radar = buildRadarData(report.topRisk[0] || { contributions: {} } as any);
+  const radar = buildRadarData(topNode);
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -78,7 +89,9 @@ export function generateHTMLReport(report: VuleReport): string {
   <h2>Top Risk Nodes</h2>
   <table>
     <tr><th>Rank</th><th>Node</th><th>File:Line</th><th>UVRS</th><th>Level</th><th>Dominant</th></tr>
-    ${report.topRisk.map((n, i) => `
+    ${report.topRisk
+      .map(
+        (n, i) => `
       <tr>
         <td>${i + 1}</td>
         <td><code>${n.nodeId}</code></td>
@@ -87,7 +100,9 @@ export function generateHTMLReport(report: VuleReport): string {
         <td class="${n.level}">${n.level}</td>
         <td>${n.dominantDimension}</td>
       </tr>
-    `).join('')}
+    `
+      )
+      .join('')}
   </table>
   <script>
     const starData = ${JSON.stringify(starMap)};

@@ -12,21 +12,40 @@
  */
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
 import { join, relative, extname } from 'path';
+import { statSync, readdirSync } from 'node:fs';
 import { analyzeFile, type AnalysisResult, type VulnerabilityFinding } from './engine/analyzer.js';
+import type { Stats } from 'node:fs';
 
-const SUPPORTED_EXT = new Set(['.py', '.js', '.ts', '.java', '.c', '.cpp', '.h', '.go', '.rs', '.php', '.phtml']);
+const SUPPORTED_EXT = new Set([
+  '.py',
+  '.js',
+  '.ts',
+  '.java',
+  '.c',
+  '.cpp',
+  '.h',
+  '.go',
+  '.rs',
+  '.php',
+  '.phtml',
+]);
 
 function walkFiles(root: string): string[] {
   const out: string[] = [];
   const stack = [root];
   while (stack.length > 0) {
     const cur = stack.pop()!;
-    let stat: any;
-    try { stat = require('fs').statSync(cur); } catch { continue; }
+    let stat: Stats;
+    try {
+      stat = statSync(cur);
+    } catch {
+      continue;
+    }
     if (stat.isDirectory()) {
-      const entries = require('fs').readdirSync(cur);
+      const entries = readdirSync(cur);
       for (const e of entries) {
-        if (e === 'node_modules' || e === '.git' || e === 'dist' || e === 'build' || e === 'vendor') continue;
+        if (e === 'node_modules' || e === '.git' || e === 'dist' || e === 'build' || e === 'vendor')
+          continue;
         stack.push(join(cur, e));
       }
     } else if (stat.isFile()) {
@@ -37,69 +56,116 @@ function walkFiles(root: string): string[] {
   return out;
 }
 
+interface BaselineFinding {
+  file: string;
+  line: number;
+  type: string;
+}
+
 function loadBaseline(path: string | undefined): Set<string> {
   if (!path || !existsSync(path)) return new Set();
   const data = JSON.parse(readFileSync(path, 'utf-8'));
-  const findings = Array.isArray(data) ? data : (data.findings || []);
-  return new Set(findings.map((f: any) => `${f.file}:${f.line}:${f.type}`));
+  const findings: BaselineFinding[] = Array.isArray(data) ? data : data.findings || [];
+  return new Set(findings.map((f) => `${f.file}:${f.line}:${f.type}`));
 }
 
-function toSarif(findings: VulnerabilityFinding[], targetPath: string, options: { stripSnippets?: boolean } = {}): unknown {
+interface SarifResult {
+  ruleId: string;
+  level: string;
+  message: { text: string };
+  locations: Array<{
+    physicalLocation: {
+      artifactLocation: { uri: string };
+      region: { startLine: number; startColumn: number };
+    };
+  }>;
+  partialFingerprints: string[];
+  properties: Record<string, unknown>;
+}
+
+interface SarifRule {
+  id: string;
+  name: string;
+  shortDescription: { text: string };
+  fullDescription: { text: string };
+  helpUri: string;
+  defaultConfiguration: { level: string };
+  properties: Record<string, unknown>;
+}
+
+function toSarif(
+  findings: VulnerabilityFinding[],
+  targetPath: string,
+  options: { stripSnippets?: boolean } = {}
+): unknown {
   const stripSnippets = options.stripSnippets !== false;
-  const rules = new Map<string, any>();
-  const results: any[] = [];
+  const rules = new Map<string, SarifRule>();
+  const results: SarifResult[] = [];
   for (const f of findings) {
     const ruleId = `sv-${f.type}`;
     if (!rules.has(ruleId)) {
       rules.set(ruleId, {
         id: ruleId,
         name: f.type,
-        shortDescription: { text: stripSnippets ? `${f.type} vulnerability detected` : `${f.type} vulnerability detected` },
-        fullDescription: { text: stripSnippets ? sanitizeSarifMessage(f.description) : f.description },
+        shortDescription: {
+          text: stripSnippets
+            ? `${f.type} vulnerability detected`
+            : `${f.type} vulnerability detected`,
+        },
+        fullDescription: {
+          text: stripSnippets ? sanitizeSarifMessage(f.description) : f.description,
+        },
         helpUri: 'https://github.com/security-vule/security-vule',
         defaultConfiguration: { level: severityToSarifLevel(f.severity) },
-        properties: stripSnippets ? { cwe: f.cwe, tags: ['security', 'vulnerability'], confidence: f.confidence } : { cwe: f.cwe, tags: ['security', 'vulnerability'] },
+        properties: stripSnippets
+          ? { cwe: f.cwe, tags: ['security', 'vulnerability'], confidence: f.confidence }
+          : { cwe: f.cwe, tags: ['security', 'vulnerability'] },
       });
     }
-    const messageText = stripSnippets ? sanitizeSarifMessage(f.description) : (f.description || `${f.type} vulnerability`);
-    const result: any = {
+    const messageText = stripSnippets
+      ? sanitizeSarifMessage(f.description)
+      : f.description || `${f.type} vulnerability`;
+    const result: SarifResult = {
       ruleId,
       level: severityToSarifLevel(f.severity),
       message: { text: messageText },
-      locations: [{
-        physicalLocation: {
-          artifactLocation: { uri: relative(process.cwd(), f.file) || f.file },
-          region: { startLine: f.line, startColumn: 1 },
+      locations: [
+        {
+          physicalLocation: {
+            artifactLocation: { uri: relative(process.cwd(), f.file) || f.file },
+            region: { startLine: f.line, startColumn: 1 },
+          },
         },
-      }],
+      ],
       partialFingerprints: [`${f.file}:${f.line}:${f.type}`],
+      properties: stripSnippets
+        ? { confidence: f.confidence, cwe: f.cwe, codeStripped: true }
+        : { confidence: f.confidence, cwe: f.cwe },
     };
-    if (!stripSnippets) {
-      result.properties = { confidence: f.confidence, cwe: f.cwe };
-    } else {
-      result.properties = { confidence: f.confidence, cwe: f.cwe, codeStripped: true };
-    }
     results.push(result);
   }
   return {
-    $schema: 'https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json',
+    $schema:
+      'https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json',
     version: '2.1.0',
-  runs: [{
-      tool: {
-        driver: {
-          name: 'security-vule',
-          informationUri: 'https://github.com/security-vule/security-vule',
-          semanticVersion: '0.1.0',
-          rules: Array.from(rules.values()),
+    runs: [
+      {
+        tool: {
+          driver: {
+            name: 'security-vule',
+            informationUri: 'https://github.com/security-vule/security-vule',
+            semanticVersion: '0.1.0',
+            rules: Array.from(rules.values()),
+          },
+        },
+        originalUriBaseIds: { PROJECTROOT: { uri: `file://${process.cwd()}/` } },
+        results,
+        properties: {
+          'security-vule/sarif-sanitized': String(stripSnippets),
+          'security-vule/ai-security-version': '1.0.0',
         },
       },
-      originalUriBaseIds: { PROJECTROOT: { uri: `file://${process.cwd()}/` } },
-      results,
-      properties: {
-        'security-vule/sarif-sanitized': String(stripSnippets),
-        'security-vule/ai-security-version': '1.0.0',
-      },
-    }],
+    ],
   };
 }
 
@@ -127,7 +193,9 @@ function severityToSarifLevel(sev: string): string {
 async function scanCommand(args: string[]): Promise<number> {
   const target = args[0];
   if (!target) {
-    console.error('Usage: security-vule scan <path> [--sarif] [--baseline FILE] [--diff] [--output FILE]');
+    console.error(
+      'Usage: security-vule scan <path> [--sarif] [--baseline FILE] [--diff] [--output FILE]'
+    );
     return 2;
   }
   let outputFile: string | undefined;
@@ -156,7 +224,10 @@ async function scanCommand(args: string[]): Promise<number> {
     try {
       const src = readFileSync(f, 'utf-8');
       result = await analyzeFile(f, src);
-    } catch (e) { console.error(`[skip] ${f}: ${(e as Error).message}`); continue; }
+    } catch (e) {
+      console.error(`[skip] ${f}: ${(e as Error).message}`);
+      continue;
+    }
     for (const finding of result.vulnerabilities) {
       if (finding.confidence >= minConfidence) allFindings.push(finding);
     }
@@ -164,13 +235,15 @@ async function scanCommand(args: string[]): Promise<number> {
   const baseline = loadBaseline(baselineFile);
   let visible = allFindings;
   if (diffMode) {
-    visible = allFindings.filter(f => !baseline.has(`${f.file}:${f.line}:${f.type}`));
+    visible = allFindings.filter((f) => !baseline.has(`${f.file}:${f.line}:${f.type}`));
   }
   if (sarifMode) {
     const out = toSarif(visible, abs, { stripSnippets: true });
     const json = JSON.stringify(out, null, 2);
-    if (outputFile) { writeFileSync(outputFile, json); console.error(`[security-vule] SARIF written to ${outputFile}`); }
-    else process.stdout.write(json);
+    if (outputFile) {
+      writeFileSync(outputFile, json);
+      console.error(`[security-vule] SARIF written to ${outputFile}`);
+    } else process.stdout.write(json);
   } else {
     const summary = {
       target,
@@ -179,11 +252,13 @@ async function scanCommand(args: string[]): Promise<number> {
       new_findings: visible.length,
       findings: visible,
     };
-    if (outputFile) { writeFileSync(outputFile, JSON.stringify(summary, null, 2)); console.error(`[security-vule] written to ${outputFile}`); }
-    else console.log(JSON.stringify(summary, null, 2));
+    if (outputFile) {
+      writeFileSync(outputFile, JSON.stringify(summary, null, 2));
+      console.error(`[security-vule] written to ${outputFile}`);
+    } else console.log(JSON.stringify(summary, null, 2));
   }
   console.error(`[security-vule] ${allFindings.length} findings, ${visible.length} shown`);
-  return visible.some(f => f.severity === 'CRITICAL') ? 1 : 0;
+  return visible.some((f) => f.severity === 'CRITICAL') ? 1 : 0;
 }
 
 async function threatModelCommand(args: string[]): Promise<number> {
@@ -212,7 +287,9 @@ async function threatModelCommand(args: string[]): Promise<number> {
     try {
       const src = readFileSync(f, 'utf-8');
       result = await analyzeFile(f, src);
-    } catch (e) { continue; }
+    } catch (e) {
+      continue;
+    }
     for (const finding of result.vulnerabilities) allFindings.push(finding);
   }
   const { buildThreatModel } = await import('./threatmodel/stride.js');
@@ -220,8 +297,9 @@ async function threatModelCommand(args: string[]): Promise<number> {
   if (withDfd) {
     const { generateDfd, dfdToMermaid } = await import('./threatmodel/dfd.js');
     const dfd = generateDfd(target, files);
-    (tm as any).dfd = dfd;
-    (tm as any).dfdMermaid = dfdToMermaid(dfd);
+    const tmWithDfd = tm as typeof tm & { dfd: unknown; dfdMermaid: string };
+    tmWithDfd.dfd = dfd;
+    tmWithDfd.dfdMermaid = dfdToMermaid(dfd);
   }
   const json = JSON.stringify(tm, null, 2);
   if (outputFile) {
@@ -275,4 +353,9 @@ async function main(): Promise<number> {
   return helpCommand();
 }
 
-main().then(c => process.exit(c)).catch(e => { console.error(e); process.exit(2); });
+main()
+  .then((c) => process.exit(c))
+  .catch((e) => {
+    console.error(e);
+    process.exit(2);
+  });

@@ -3,6 +3,8 @@
  */
 import { readFileSync, writeFileSync } from 'fs';
 import { CPGBuilder } from '../../engine/cpg/builder.js';
+import type { ProgramGraph, PGEdge, PGNode } from '../../engine/program-graph.js';
+import type { CPGLanguage } from '../../engine/cpg/types.js';
 import { VuleEngine } from '../../engine/vule-engine.js';
 import { loadConfig } from '../../engine/vule-config.js';
 import { generateHTMLReport } from '../../visualization/html-report.js';
@@ -21,29 +23,39 @@ export async function analyzeCommand(target: string, options: AnalyzeOptions): P
 
   // Lightweight stub: build a minimal CPG from lines for Sprint 5 smoke testing.
   // Sprint 7 will integrate real parser via parseSource + ProgramGraphBuilder.
-  const lines = code.split('\n').filter(l => l.trim());
-  const nodes = new Map<string, any>();
+  const lines = code.split('\n').filter((l) => l.trim());
+  const nodes = new Map<string, StubNode>();
+  const lang = detectLanguage(target);
   lines.forEach((line, i) => {
-    nodes.set(`n${i}`, {
-      id: `n${i}`,
+    const id = `n${i}`;
+    const node = {
+      id,
       type: 'stmt',
       file: target,
       line: i + 1,
       col: 0,
       code: line,
-      language: target.endsWith('.py') ? 'python' : target.endsWith('.ts') ? 'typescript' : target.endsWith('.js') ? 'javascript' : 'php',
-      features: {},
-    });
+      language: lang,
+      features: new Map(),
+    } as unknown as StubNode;
+    nodes.set(id, node);
   });
-  const edges: any[] = [];
+  const edges: StubEdge[] = [];
   for (let i = 0; i < lines.length - 1; i++) {
     edges.push({ source: `n${i}`, target: `n${i + 1}`, type: 'DFG' });
   }
-  const pg = { nodes, edges, nodeCount: lines.length, edgeCount: edges.length, edgeTypeCounts: {}, filePath: target, language: 'php' };
-  const lang = target.endsWith('.py') ? 'python' : target.endsWith('.ts') ? 'typescript' : target.endsWith('.js') ? 'javascript' : 'php';
-  const cpg = new CPGBuilder(lang as any, target).build(pg as any);
+  const pg: StubPG = {
+    nodes,
+    edges,
+    nodeCount: lines.length,
+    edgeCount: edges.length,
+    edgeTypeCounts: {} as Record<string, number>,
+    filePath: target,
+    language: 'php',
+  };
+  const cpg = new CPGBuilder(lang, target).build(pg);
 
-  const sinks = cpg.sinkNodes().map(n => n.id);
+  const sinks = cpg.sinkNodes().map((n) => n.id);
   const engine = new VuleEngine(cpg, sinks, [], config);
   if (options.dimensions) {
     engine.config.dimensions.enabled = options.dimensions.split(',');
@@ -62,4 +74,31 @@ export async function analyzeCommand(target: string, options: AnalyzeOptions): P
       console.log(json);
     }
   }
+}
+
+function detectLanguage(filePath: string): CPGLanguage {
+  if (filePath.endsWith('.py')) return 'python';
+  if (filePath.endsWith('.ts') || filePath.endsWith('.tsx')) return 'typescript';
+  if (
+    filePath.endsWith('.js') ||
+    filePath.endsWith('.jsx') ||
+    filePath.endsWith('.mjs') ||
+    filePath.endsWith('.cjs')
+  )
+    return 'javascript';
+  return 'php';
+}
+
+interface StubNode extends PGNode {
+  file: string;
+  line: number;
+}
+
+interface StubEdge extends PGEdge {
+  type: 'DFG';
+}
+
+interface StubPG extends ProgramGraph {
+  filePath: string;
+  language: string;
 }

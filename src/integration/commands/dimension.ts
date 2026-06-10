@@ -3,6 +3,8 @@
  */
 import { readFileSync } from 'fs';
 import { DIMENSIONS } from '../../engine/dimensions/registry.js';
+import { createCPG } from '../../engine/cpg/builder.js';
+import type { CPG, CPGNode } from '../../engine/cpg/types.js';
 
 export async function dimensionCommand(name: string, file: string): Promise<void> {
   const dim = DIMENSIONS[name];
@@ -16,10 +18,11 @@ export async function dimensionCommand(name: string, file: string): Promise<void
 
   // Mock CPG: 1 node per line
   const lines = code.split('\n');
-  const nodes = new Map<string, any>();
+  const nodeMap = new Map<string, CPGNode>();
   lines.forEach((line, i) => {
-    nodes.set(`n${i}`, {
-      id: `n${i}`,
+    const id = `n${i}`;
+    nodeMap.set(id, {
+      id,
       type: 'stmt',
       file,
       line: i + 1,
@@ -29,21 +32,7 @@ export async function dimensionCommand(name: string, file: string): Promise<void
       features: {},
     });
   });
-  const cpg = {
-    nodes,
-    edges: [],
-    language: 'php',
-    getNode: (id: string) => nodes.get(id),
-    outEdges: () => [],
-    inEdges: () => [],
-    shortestPath: () => null,
-    sinkNodes: () => [],
-    sourcesFor: () => [],
-    functions: () => [],
-    callGraph: () => [],
-    inDegree: () => 0,
-    outDegree: () => 0,
-  } as any;
+  const cpg = createCPG(nodeMap, [], 'php') as CPG;
 
   for (const node of cpg.nodes.values()) {
     const v = dim.compute(node, cpg);

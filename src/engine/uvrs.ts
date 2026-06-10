@@ -49,12 +49,12 @@ export interface UVRSResult {
 }
 
 const DEFAULT_WEIGHTS: UVRSWeights = {
-  taint: 0.20,
+  taint: 0.2,
   ast: 0.15,
-  llm: 0.10,
-  consensus: 0.10,
-  verify: 0.10,
-  chain: 0.10,
+  llm: 0.1,
+  consensus: 0.1,
+  verify: 0.1,
+  chain: 0.1,
   darkMatter: 0.08,
   evolution: 0.05,
   quantum: 0.07,
@@ -63,7 +63,7 @@ const DEFAULT_WEIGHTS: UVRSWeights = {
 
 const RISK_THRESHOLDS: Record<RiskLevel, number> = {
   [RiskLevel.LOW]: 0.25,
-  [RiskLevel.MEDIUM]: 0.50,
+  [RiskLevel.MEDIUM]: 0.5,
   [RiskLevel.HIGH]: 0.75,
   [RiskLevel.CRITICAL]: 0.85,
 };
@@ -87,7 +87,16 @@ export class UVRS {
 
   constructor(weights?: Partial<UVRSWeights>, thresholds?: Partial<Record<RiskLevel, number>>) {
     this.weights = { ...DEFAULT_WEIGHTS, ...weights };
-    this.thresholds = { ...RISK_THRESHOLDS, ...(thresholds as any) };
+    if (thresholds) {
+      this.thresholds = { ...RISK_THRESHOLDS };
+      for (const [k, v] of Object.entries(thresholds)) {
+        if (v !== undefined) {
+          this.thresholds[k as RiskLevel] = v;
+        }
+      }
+    } else {
+      this.thresholds = { ...RISK_THRESHOLDS };
+    }
     this.validateWeights();
   }
 
@@ -126,14 +135,22 @@ export class UVRS {
   }
 
   classify(score: number): RiskLevel {
-    const order: RiskLevel[] = [RiskLevel.CRITICAL, RiskLevel.HIGH, RiskLevel.MEDIUM, RiskLevel.LOW];
+    const order: RiskLevel[] = [
+      RiskLevel.CRITICAL,
+      RiskLevel.HIGH,
+      RiskLevel.MEDIUM,
+      RiskLevel.LOW,
+    ];
     for (const level of order) {
       if (score >= this.thresholds[level]) return level;
     }
     return RiskLevel.LOW;
   }
 
-  private dominantDimension(contributions: Record<string, number>): { name: string; contribution: number } {
+  private dominantDimension(contributions: Record<string, number>): {
+    name: string;
+    contribution: number;
+  } {
     const entries = Object.entries(contributions);
     if (entries.length === 0) return { name: 'unknown', contribution: 0 };
     const [name, contrib] = entries.reduce((max, curr) => (curr[1] > max[1] ? curr : max));
@@ -142,7 +159,12 @@ export class UVRS {
   }
 
   getRiskDistribution(scores: number[]): Record<RiskLevel, number> {
-    const dist = { [RiskLevel.LOW]: 0, [RiskLevel.MEDIUM]: 0, [RiskLevel.HIGH]: 0, [RiskLevel.CRITICAL]: 0 };
+    const dist = {
+      [RiskLevel.LOW]: 0,
+      [RiskLevel.MEDIUM]: 0,
+      [RiskLevel.HIGH]: 0,
+      [RiskLevel.CRITICAL]: 0,
+    };
     for (const s of scores) dist[this.classify(s)]++;
     return dist;
   }
@@ -151,7 +173,10 @@ export class UVRS {
     return { weights: { ...this.weights }, thresholds: { ...this.thresholds } };
   }
 
-  static fromConfig(config: { weights?: UVRSWeights; thresholds?: Record<RiskLevel, number> }): UVRS {
+  static fromConfig(config: {
+    weights?: UVRSWeights;
+    thresholds?: Record<RiskLevel, number>;
+  }): UVRS {
     return new UVRS(config.weights, config.thresholds);
   }
 }
