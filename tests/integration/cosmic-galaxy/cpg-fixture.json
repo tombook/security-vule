@@ -1,0 +1,36 @@
+{
+  "language": "php",
+  "nodes": [
+    {
+      "id": "src",
+      "type": "var",
+      "file": "test.php",
+      "line": 1,
+      "col": 0,
+      "code": "$_GET[\"x\"]",
+      "features": { "sensitivity": 1.0, "complexity": 1 }
+    },
+    {
+      "id": "mid",
+      "type": "stmt",
+      "file": "test.php",
+      "line": 2,
+      "col": 0,
+      "code": "$q = process($_GET[\"x\"])",
+      "features": { "halstead_volume": 350, "nesting_depth": 2 }
+    },
+    {
+      "id": "sink",
+      "type": "stmt",
+      "file": "test.php",
+      "line": 3,
+      "col": 0,
+      "code": "mysql_query($q)",
+      "features": { "is_sink": 1, "dangerousness": 0.9 }
+    }
+  ],
+  "edges": [
+    { "source": "src", "target": "mid", "kind": "data" },
+    { "source": "mid", "target": "sink", "kind": "data" }
+  ]
+}
