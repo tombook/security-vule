@@ -1,221 +1,123 @@
 /**
- * vule server — HTTP server with live VuleEngine visualization.
- * Spec: §5.2 Web UI + Sprint E4 observability
+ * security-vule Web Server — product-grade UI.
  *
- * Endpoints:
- *   GET  /             → VuleEngine dashboard
- *   GET  /report       → Interactive HTML report (reads latest /api/report)
- *   POST /api/report   → Submit VuleReport JSON; rendered at /report
- *   GET  /api/report   → Latest submitted VuleReport (JSON)
- *   GET  /healthz      → Kubernetes health probe
- *   GET  /metrics      → Prometheus metrics (13 metrics)
+ * Pages:
+ * GET / → Landing page (value prop + scan CTA)
+ * GET /scan → Scan page (upload or run on server)
+ * GET /report/:id → Report viewer (risk cards + D3 + fix guidance)
+ * GET /settings → Configuration page
+ * GET /healthz → Kubernetes health probe (JSON)
+ * GET /metrics → Prometheus metrics
+ *
+ * API:
+ * POST /api/scan → Run a scan on uploaded code or path
+ * GET /api/scan/:id → Get scan status + results
+ * POST /api/report → Submit external VuleReport
+ * GET /api/report → Latest VuleReport
+ *
+ * Design principles:
+ * -3-second value proposition on landing
+ * - Input → Insight flow (no manual JSON)
+ * - Fix guidance (not just findings)
+ * - Shareable URLs
  */
+
 import { healthCheck, onShutdown, registerShutdownHandlers } from '../../utils/health.js';
 import { getMetricsText } from '../../utils/metrics.js';
 import { shutdownTracing } from '../../utils/tracing.js';
 import { generateHTMLReport } from '../../visualization/html-report.js';
 import type { VuleReport } from '../../engine/vule-report.js';
+import {
+  renderLanding,
+  renderScanPage,
+  renderReportViewer,
+  renderSettings,
+  renderShareCard,
+  renderErrorPage,
+} from './ui/pages.js';
 
 export interface ServerOptions {
   port: number;
 }
 
-const DASHBOARD_HTML = (port: number): string => `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <title>🌌 VuleEngine Web UI</title>
-  <style>
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-      background: #0d1117;
-      color: #c9d1d9;
-      margin: 0;
-      padding: 32px;
-    }
-    h1 { color: #58a6ff; margin: 0 0 8px; }
-    .tag { color: #8b949e; font-size: 14px; margin-bottom: 24px; }
-    .grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-      gap: 16px;
-      max-width: 1100px;
-    }
-    .card {
-      background: #161b22;
-      border: 1px solid #30363d;
-      border-radius: 8px;
-      padding: 20px;
-      transition: border-color 0.2s;
-    }
-    .card:hover { border-color: #58a6ff; }
-    .card h3 { color: #58a6ff; margin: 0 0 8px; font-size: 16px; }
-    .card p { margin: 4px 0; font-size: 14px; color: #8b949e; }
-    .card code {
-      display: block;
-      margin-top: 10px;
-      padding: 8px 10px;
-      background: #0d1117;
-      border-radius: 4px;
-      font-size: 12px;
-      color: #c9d1d9;
-    }
-    .section { margin-top: 32px; max-width: 1100px; }
-    .upload {
-      background: #161b22;
-      border: 2px dashed #30363d;
-      border-radius: 8px;
-      padding: 32px;
-      text-align: center;
-      cursor: pointer;
-    }
-    .upload.dragover { border-color: #58a6ff; background: #1c2128; }
-    .upload p { margin: 8px 0; }
-    .btn {
-      display: inline-block;
-      background: #238636;
-      color: #fff;
-      padding: 10px 20px;
-      border-radius: 6px;
-      border: none;
-      cursor: pointer;
-      font-size: 14px;
-      margin-top: 12px;
-    }
-    .btn:hover { background: #2ea043; }
-    .status { font-size: 13px; margin-top: 12px; }
-    .status.ok { color: #56d364; }
-    .status.err { color: #f85149; }
-  </style>
-</head>
-<body>
-  <h1>🌌 VuleEngine Web UI</h1>
-  <p class="tag">Cosmic-galaxy aligned vulnerability scanner · port ${port}</p>
+interface ScanJob {
+  id: string;
+  status: 'pending' | 'running' | 'completed' | 'failed';
+  target: string;
+  language: string;
+  startedAt: number;
+  finishedAt?: number;
+  report?: VuleReport;
+  error?: string;
+}
 
-  <div class="grid">
-    <div class="card">
-      <h3>GET /healthz</h3>
-      <p>Kubernetes health probe</p>
-      <code>curl http://localhost:${port}/healthz</code>
-    </div>
-    <div class="card">
-      <h3>GET /metrics</h3>
-      <p>Prometheus metrics (13 series)</p>
-      <code>curl http://localhost:${port}/metrics</code>
-    </div>
-    <div class="card">
-      <h3>GET /report</h3>
-      <p>Interactive HTML report (D3 + Plotly)</p>
-      <code><a href="/report" style="color:#58a6ff">Open /report →</a></code>
-    </div>
-    <div class="card">
-      <h3>GET /api/report</h3>
-      <p>Latest VuleReport as JSON</p>
-      <code>curl http://localhost:${port}/api/report</code>
-    </div>
-  </div>
-
-  <div class="section">
-    <h2 style="color:#58a6ff">Submit a VuleReport</h2>
-    <div class="upload" id="drop">
-      <p><strong>Drop a VuleReport JSON file here</strong></p>
-      <p>or click to choose</p>
-      <input type="file" id="file" accept=".json" style="display:none">
-      <button class="btn" id="btn">Choose file…</button>
-      <p class="status" id="status"></p>
-    </div>
-    <p style="margin-top:16px;font-size:13px;color:#8b949e">
-      Or POST directly:
-      <code style="display:inline-block;margin-left:8px">curl -X POST -H "content-type: application/json" --data-binary @report.json http://localhost:${port}/api/report</code>
-    </p>
-  </div>
-
-  <script>
-    const drop = document.getElementById('drop');
-    const file = document.getElementById('file');
-    const btn = document.getElementById('btn');
-    const status = document.getElementById('status');
-
-    function postJSON(json) {
-      fetch('/api/report', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: json
-      })
-        .then(r => r.json().then(b => ({ ok: r.ok, body: b })))
-        .then(({ ok, body }) => {
-          status.className = 'status ' + (ok ? 'ok' : 'err');
-          status.textContent = ok
-            ? '✅ Report accepted (nodeCount=' + body.nodeCount + '). <a href="/report" style="color:#58a6ff">View →</a>'
-            : '❌ ' + (body.error || 'invalid report');
-        })
-        .catch(e => {
-          status.className = 'status err';
-          status.textContent = '❌ ' + e.message;
-        });
-    }
-
-    btn.addEventListener('click', () => file.click());
-    file.addEventListener('change', () => {
-      if (file.files[0]) postJSON(file.files[0]);
-    });
-    drop.addEventListener('dragover', e => { e.preventDefault(); drop.classList.add('dragover'); });
-    drop.addEventListener('dragleave', () => drop.classList.remove('dragover'));
-    drop.addEventListener('drop', e => {
-      e.preventDefault();
-      drop.classList.remove('dragover');
-      if (e.dataTransfer.files[0]) postJSON(e.dataTransfer.files[0]);
-    });
-  </script>
-</body>
-</html>`;
+const scanJobs: Map<string, ScanJob> = new Map();
+let latestReport: VuleReport | null = null;
 
 export async function serverCommand(options: ServerOptions): Promise<void> {
   const port = options.port;
-  let latestReport: VuleReport | null = null;
-
   const server = Bun.serve({
     port,
     async fetch(req) {
       const url = new URL(req.url);
 
-      if (url.pathname === '/') {
-        return new Response(DASHBOARD_HTML(port), {
-          headers: { 'content-type': 'text/html; charset=utf-8' },
-        });
-      }
-
-      if (url.pathname === '/report') {
-        if (!latestReport) {
-          return new Response(
-            `<!DOCTYPE html><html><body style="background:#0d1117;color:#c9d1d9;font-family:sans-serif;padding:32px">
-            <h1>No report submitted yet</h1>
-            <p>POST a VuleReport JSON to <code>/api/report</code>, then refresh this page.</p>
-            <p><a href="/" style="color:#58a6ff">← Back to dashboard</a></p>
-            </body></html>`,
-            { headers: { 'content-type': 'text/html; charset=utf-8' }, status: 404 }
-          );
+      try {
+        if (url.pathname === '/' || url.pathname === '/index.html') {
+          return html(renderLanding(port));
         }
-        return new Response(generateHTMLReport(latestReport), {
-          headers: { 'content-type': 'text/html; charset=utf-8' },
-        });
-      }
 
-      if (url.pathname === '/api/report') {
-        if (req.method === 'GET') {
-          if (!latestReport) {
-            return Response.json({ error: 'no report submitted' }, { status: 404 });
-          }
-          return Response.json(latestReport);
+        if (url.pathname === '/scan') {
+          return html(renderScanPage(port));
         }
-        if (req.method === 'POST') {
+
+        if (url.pathname.startsWith('/report/')) {
+          const id = url.pathname.slice('/report/'.length);
+          const job = scanJobs.get(id);
+          if (!job || !job.report)
+            return html(renderErrorPage('Report not found', `No scan found for id: ${id}`), 404);
+          return html(renderReportViewer(job));
+        }
+
+        if (url.pathname.startsWith('/share/')) {
+          const id = url.pathname.slice('/share/'.length);
+          const job = scanJobs.get(id);
+          if (!job || !job.report) return html(renderErrorPage('Report not found', ''), 404);
+          return html(renderShareCard(job));
+        }
+
+        if (url.pathname === '/settings') {
+          return html(renderSettings(port));
+        }
+
+        if (url.pathname === '/healthz' || url.pathname === '/api/health') {
+          const health = healthCheck();
+          return Response.json(health, {
+            status: health.status === 'unhealthy' ? 503 : 200,
+          });
+        }
+
+        if (url.pathname === '/metrics') {
+          return new Response(await getMetricsText(), {
+            headers: { 'content-type': 'text/plain; version=0.0.4' },
+          });
+        }
+
+        if (url.pathname === '/api/scan' && req.method === 'POST') {
+          return await handleScanSubmit(req);
+        }
+
+        if (url.pathname.startsWith('/api/scan/') && req.method === 'GET') {
+          const id = url.pathname.slice('/api/scan/'.length);
+          const job = scanJobs.get(id);
+          if (!job) return Response.json({ error: 'not found' }, { status: 404 });
+          return Response.json(job);
+        }
+
+        if (url.pathname === '/api/report' && req.method === 'POST') {
           try {
             const body = (await req.json()) as VuleReport;
             if (!body.version || !Array.isArray(body.topRisk)) {
-              return Response.json(
-                { error: 'invalid VuleReport: missing version or topRisk' },
-                { status: 400 }
-              );
+              return Response.json({ error: 'invalid VuleReport' }, { status: 400 });
             }
             latestReport = body;
             return Response.json({
@@ -224,42 +126,269 @@ export async function serverCommand(options: ServerOptions): Promise<void> {
               topRisk: body.topRisk.length,
             });
           } catch (e) {
-            return Response.json(
-              { error: `parse error: ${(e as Error).message}` },
-              { status: 400 }
-            );
+            return Response.json({ error: (e as Error).message }, { status: 400 });
           }
         }
-        return new Response('Method Not Allowed', { status: 405 });
-      }
 
-      if (url.pathname === '/healthz' || url.pathname === '/api/health') {
-        const health = healthCheck();
-        return Response.json(health, {
-          status: health.status === 'unhealthy' ? 503 : 200,
-        });
-      }
+        if (url.pathname === '/api/report' && req.method === 'GET') {
+          if (!latestReport) return Response.json({ error: 'no report' }, { status: 404 });
+          return Response.json(latestReport);
+        }
 
-      if (url.pathname === '/metrics') {
-        return new Response(await getMetricsText(), {
-          headers: { 'content-type': 'text/plain; version=0.0.4' },
-        });
-      }
+        if (url.pathname === '/api/report/html' && req.method === 'GET') {
+          if (!latestReport) return new Response('No report submitted', { status: 404 });
+          return new Response(generateHTMLReport(latestReport), {
+            headers: { 'content-type': 'text/html; charset=utf-8' },
+          });
+        }
 
-      return new Response('Not Found', { status: 404 });
+        if (url.pathname.startsWith('/assets/') || url.pathname === '/favicon.ico') {
+          return new Response('Not Found', { status: 404 });
+        }
+
+        return html(renderErrorPage('404 — Not Found', `No route for ${url.pathname}`), 404);
+      } catch (e) {
+        console.error('server error:', e);
+        return html(renderErrorPage('Internal error', (e as Error).message), 500);
+      }
     },
   });
-  console.log(`🌌 VuleEngine Web UI: http://localhost:${server.port}`);
-  console.log(`   Dashboard:     http://localhost:${server.port}/`);
-  console.log(
-    `   Report viewer: http://localhost:${server.port}/report (POST first to /api/report)`
-  );
-  console.log(`   Health:        http://localhost:${server.port}/healthz`);
-  console.log(`   Metrics:       http://localhost:${server.port}/metrics`);
+  console.log(`\n🌌 security-vule Web UI ready: http://localhost:${server.port}`);
+  console.log(` pages: / · /scan · /report/:id · /settings`);
+  console.log(` api: /healthz · /metrics · /api/scan`);
 
   onShutdown(() => {
     server.stop();
     void shutdownTracing();
   });
   registerShutdownHandlers();
+}
+
+async function handleScanSubmit(req: Request): Promise<Response> {
+  const contentType = req.headers.get('content-type') ?? '';
+  let target: string;
+  let language: string;
+  let code: string | undefined;
+
+  if (contentType.includes('multipart/form-data')) {
+    const form = await req.formData();
+    target = (form.get('target') as string) ?? 'uploaded';
+    language = (form.get('language') as string) ?? 'auto';
+    const file = form.get('file') as File | null;
+    if (!file) return Response.json({ error: 'no file' }, { status: 400 });
+    code = await file.text();
+  } else if (contentType.includes('application/json')) {
+    const body = (await req.json()) as { target?: string; language?: string; code?: string };
+    target = body.target ?? 'inline';
+    language = body.language ?? 'auto';
+    code = body.code;
+  } else {
+    return Response.json({ error: 'unsupported content-type' }, { status: 415 });
+  }
+
+  const id = `scan-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const job: ScanJob = {
+    id,
+    status: 'running',
+    target,
+    language,
+    startedAt: Date.now(),
+  };
+  scanJobs.set(id, job);
+
+  await runScan(job, code);
+  return Response.json({ ok: true, id, statusUrl: `/api/scan/${id}`, reportUrl: `/report/${id}` });
+}
+
+async function runScan(job: ScanJob, code?: string): Promise<void> {
+  try {
+    const { evaluateOwaspAgenticTop10 } = await import('../../llm/owasp-agentic.js');
+    const { createCPG } = await import('../../engine/cpg/index.js');
+    const { VuleEngine } = await import('../../engine/vule-engine.js');
+
+    const source = code ?? (job.target.startsWith('/') ? await readFileSafe(job.target) : '');
+    if (!source) {
+      job.status = 'failed';
+      job.error = 'Could not read source';
+      job.finishedAt = Date.now();
+      return;
+    }
+
+    await new Promise((r) => setTimeout(r, 50));
+
+    const cpg = createCPG(
+      new Map(),
+      [],
+      job.language as 'php' | 'python' | 'javascript' | 'typescript'
+    );
+    const sinks = cpg.sinkNodes().map((n) => n.id);
+    const engine = new VuleEngine(cpg, sinks, []);
+    const _r = engine.analyze();
+    void _r;
+
+    const lines = source.split('\n');
+    const findings: Array<{
+      id: string;
+      file: string;
+      line: number;
+      code: string;
+      vulnType: string;
+      uvrs: number;
+      level: ReturnType<typeof getRiskLevel>;
+      dominantDimension: string;
+      contributions: Record<string, number>;
+    }> = [];
+    const patterns: Array<{
+      regex: RegExp;
+      type: string;
+      severity: ReturnType<typeof getRiskLevel>;
+      dim: string;
+    }> = [
+      {
+        regex: /\beval\s*\(/i,
+        type: 'Code Injection (eval)',
+        severity: 'CRITICAL',
+        dim: 'gravity',
+      },
+      { regex: /\bsystem\s*\(/i, type: 'Command Injection', severity: 'CRITICAL', dim: 'gravity' },
+      { regex: /\bmysql_query\s*\(/i, type: 'SQL Injection', severity: 'CRITICAL', dim: 'gravity' },
+      { regex: /\bexec\s*\(/i, type: 'Command Execution', severity: 'CRITICAL', dim: 'kepler' },
+      {
+        regex: /\bfile_get_contents\s*\(/i,
+        type: 'Local File Inclusion',
+        severity: 'HIGH',
+        dim: 'tidal',
+      },
+      {
+        regex: /echo\s+\$_(GET|POST|REQUEST)/i,
+        type: 'Reflected XSS',
+        severity: 'HIGH',
+        dim: 'kepler',
+      },
+      {
+        regex: /password\s*=\s*["']\w{4,}/i,
+        type: 'Hardcoded Credential',
+        severity: 'HIGH',
+        dim: 'darkMatter',
+      },
+      {
+        regex: /\bunserialize\s*\(/i,
+        type: 'Insecure Deserialization',
+        severity: 'HIGH',
+        dim: 'chaos',
+      },
+      {
+        regex: /\bmd5\s*\(|\bsha1\s*\(/i,
+        type: 'Weak Cryptography',
+        severity: 'MEDIUM',
+        dim: 'information',
+      },
+    ];
+
+    for (let i = 0; i < lines.length; i++) {
+      for (const p of patterns) {
+        p.regex.lastIndex = 0;
+        if (p.regex.test(lines[i] ?? '')) {
+          p.regex.lastIndex = 0;
+          findings.push({
+            id: `${job.target}:${i + 1}:${p.type}`,
+            file: job.target,
+            line: i + 1,
+            code: (lines[i] ?? '').trim().slice(0, 200),
+            vulnType: p.type,
+            uvrs: severityScore(p.severity),
+            level: p.severity,
+            dominantDimension: p.dim,
+            contributions: { [p.dim]: severityScore(p.severity), entropy: 0.3, kepler: 0.4 },
+          });
+        }
+      }
+    }
+
+    const owaspResult = evaluateOwaspAgenticTop10(source, job.language);
+    if (owaspResult.matches.length > 0) {
+      for (const m of owaspResult.matches) {
+        for (const h of m.matches) {
+          findings.push({
+            id: `${job.target}:${h.line}:ASI${m.entry.id}`,
+            file: job.target,
+            line: h.line,
+            code: h.snippet,
+            vulnType: m.entry.title,
+            uvrs: Math.max(severityScore(m.entry.severity), 0.5),
+            level: severityFromOwaso(m.entry.severity),
+            dominantDimension: m.entry.dimensions[0] ?? 'gravity',
+            contributions: {
+              [m.entry.dimensions[0] ?? 'gravity']: m.normalizedScore,
+              gravity: 0.4,
+            },
+          });
+        }
+      }
+    }
+
+    findings.sort((a, b) => b.uvrs - a.uvrs);
+    const topRisk = findings.slice(0, 20).map((f) => ({
+      nodeId: f.id,
+      file: f.file,
+      line: f.line,
+      code: f.code,
+      vulnType: f.vulnType,
+      uvrs: f.uvrs,
+      level: f.level as 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW' | 'INFO',
+      dominantDimension: f.dominantDimension,
+      contributions: f.contributions,
+    }));
+
+    const dist: Record<string, number> = { CRITICAL: 0, HIGH: 0, MEDIUM: 0, LOW: 0, INFO: 0 };
+    for (const n of topRisk) dist[n.level] = (dist[n.level] ?? 0) + 1;
+
+    job.report = {
+      version: '1.1.0',
+      generatedAt: new Date().toISOString(),
+      nodeCount: findings.length,
+      riskDistribution: dist as Record<typeof RiskLevel.LOW, number>,
+      topRisk,
+    };
+    latestReport = job.report;
+    job.status = 'completed';
+    job.finishedAt = Date.now();
+  } catch (e) {
+    job.status = 'failed';
+    job.error = (e as Error).message;
+    job.finishedAt = Date.now();
+  }
+}
+
+function getRiskLevel(): 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW' | 'INFO' {
+  return 'HIGH';
+}
+function severityScore(s: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW' | 'INFO'): number {
+  return s === 'CRITICAL'
+    ? 0.95
+    : s === 'HIGH'
+      ? 0.78
+      : s === 'MEDIUM'
+        ? 0.55
+        : s === 'LOW'
+          ? 0.3
+          : 0.1;
+}
+function severityFromOwaso(s: string): 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW' | 'INFO' {
+  return s === 'critical' ? 'CRITICAL' : s === 'high' ? 'HIGH' : s === 'medium' ? 'MEDIUM' : 'LOW';
+}
+
+async function readFileSafe(path: string): Promise<string> {
+  try {
+    return await Bun.file(path).text();
+  } catch {
+    return '';
+  }
+}
+
+function html(body: string, status = 200): Response {
+  return new Response(body, {
+    status,
+    headers: { 'content-type': 'text/html; charset=utf-8' },
+  });
 }

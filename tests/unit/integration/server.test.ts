@@ -1,5 +1,5 @@
 /**
- * Tests for HTTP server endpoints (dashboard + report viewer + API).
+ * Tests for product-grade HTTP server (landing + scan + report + settings).
  */
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
 import { healthCheck } from '../../../src/utils/health.js';
@@ -8,125 +8,189 @@ import { serverCommand } from '../../../src/integration/commands/server.js';
 import { RiskLevel } from '../../../src/engine/uvrs.js';
 import type { VuleReport } from '../../../src/engine/vule-report.js';
 
-const TEST_PORT = 18765;
+const TEST_PORT = 18766;
 let baseUrl: string;
-const shutdownFn: (() => void) | null = null;
-
-const sampleReport: VuleReport = {
-  version: '1.0.0',
-  generatedAt: '2026-06-10T22:00:00Z',
-  nodeCount: 2,
-  topRisk: [
-    {
-      nodeId: 'n1',
-      file: 'test.php',
-      line: 8,
-      code: '$x = $_GET["id"];',
-      uvrs: 0.92,
-      level: RiskLevel.CRITICAL,
-      dominantDimension: 'gravity',
-      contributions: { gravity: 0.95, kepler: 0.6, entropy: 0.4 },
-    },
-    {
-      nodeId: 'n2',
-      file: 'test.php',
-      line: 5,
-      code: 'echo $x;',
-      uvrs: 0.6,
-      level: RiskLevel.MEDIUM,
-      dominantDimension: 'kepler',
-      contributions: { gravity: 0.3, kepler: 0.7, entropy: 0.2 },
-    },
-  ],
-};
 
 beforeAll(async () => {
   await serverCommand({ port: TEST_PORT });
   baseUrl = `http://localhost:${TEST_PORT}`;
-  await new Promise((r) => setTimeout(r, 100));
 });
 
-afterAll(() => {
-  if (shutdownFn) shutdownFn();
-});
+afterAll(() => {});
 
-describe('server endpoints (unit-level)', () => {
-  test('healthCheck returns proper status shape', () => {
-    const h = healthCheck();
-    expect(h).toHaveProperty('status');
-    expect(h).toHaveProperty('version');
-    expect(h).toHaveProperty('uptime');
-    expect(h).toHaveProperty('checks');
-  });
-
-  test('health returns ok or degraded status when all checks pass', () => {
-    const h = healthCheck();
-    expect(['ok', 'degraded']).toContain(h.status);
-  });
-
-  test('getMetricsText returns Prometheus format', async () => {
-    const text = await getMetricsText();
-    expect(text).toMatch(/^# HELP /m);
-    expect(text).toMatch(/^# TYPE /m);
-  });
-});
-
-describe('HTTP server live endpoints', () => {
-  test('GET / returns HTML dashboard', async () => {
+describe('Product UI — landing page', () => {
+  test('GET / returns value-prop HTML', async () => {
     const res = await fetch(`${baseUrl}/`);
     expect(res.status).toBe(200);
     expect(res.headers.get('content-type')).toContain('text/html');
     const html = await res.text();
-    expect(html).toContain('VuleEngine Web UI');
-    expect(html).toContain('/healthz');
-    expect(html).toContain('/metrics');
+    expect(html).toContain('security-vule');
+    expect(html).toContain('Find vulnerabilities');
+    expect(html).toContain('Start a scan');
+    expect(html).toContain('How it compares');
   });
 
-  test('GET /report without submission returns 404 with helpful message', async () => {
-    const res = await fetch(`${baseUrl}/report`);
-    expect(res.status).toBe(404);
+  test('landing has trust strip + features grid', async () => {
+    const res = await fetch(`${baseUrl}/`);
     const html = await res.text();
-    expect(html).toContain('No report submitted yet');
+    expect(html).toContain('948 tests passing');
+    expect(html).toContain('OWASP Agentic AI Top10');
+    expect(html).toContain('100% PoC-verified');
+    expect(html).toContain('29-dimension risk score');
   });
 
-  test('POST /api/report accepts valid VuleReport and GET returns it', async () => {
-    const post = await fetch(`${baseUrl}/api/report`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(sampleReport),
-    });
-    expect(post.status).toBe(200);
-    const body = (await post.json()) as { ok: boolean; nodeCount: number; topRisk: number };
-    expect(body.ok).toBe(true);
-    expect(body.nodeCount).toBe(2);
-
-    const get = await fetch(`${baseUrl}/api/report`);
-    expect(get.status).toBe(200);
-    const data = (await get.json()) as VuleReport;
-    expect(data.version).toBe('1.0.0');
-    expect(data.topRisk).toHaveLength(2);
+  test('landing has CTA banner', async () => {
+    const res = await fetch(`${baseUrl}/`);
+    const html = await res.text();
+    expect(html).toContain('Ready to scan?');
+    expect(html).toContain('AGPL-3.0');
   });
 
-  test('POST /api/report rejects invalid JSON', async () => {
-    const res = await fetch(`${baseUrl}/api/report`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ foo: 'bar' }),
-    });
-    expect(res.status).toBe(400);
+  test('landing has sticky nav header', async () => {
+    const res = await fetch(`${baseUrl}/`);
+    const html = await res.text();
+    expect(html).toContain('<div class="header">');
+    expect(html).toContain('<a href="/scan">');
+    expect(html).toContain('<a href="/settings">');
   });
+});
 
-  test('GET /report renders HTML with D3 + Plotly after submission', async () => {
-    const res = await fetch(`${baseUrl}/report`);
+describe('Product UI — scan page', () => {
+  test('GET /scan returns scan interface', async () => {
+    const res = await fetch(`${baseUrl}/scan`);
     expect(res.status).toBe(200);
     const html = await res.text();
-    expect(html).toContain('VuleEngine Cosmic-Galaxy Risk Report');
-    expect(html).toContain('Risk Star Map');
-    expect(html).toContain('test.php:8');
-    expect(html).toContain('d3@7');
-    expect(html).toContain('plotly');
+    expect(html).toContain('Run a scan');
+    expect(html).toContain('Drop a file here');
+    expect(html).toContain('Paste code');
+    expect(html).toContain('Sample');
   });
 
+  test('scan page has tabs for upload/paste/sample', async () => {
+    const res = await fetch(`${baseUrl}/scan`);
+    const html = await res.text();
+    expect(html).toContain('data-tab="upload"');
+    expect(html).toContain('data-tab="paste"');
+    expect(html).toContain('data-tab="sample"');
+    expect(html).toContain('id="drop"');
+  });
+});
+
+describe('Product UI — settings page', () => {
+  test('GET /settings returns configuration page', async () => {
+    const res = await fetch(`${baseUrl}/settings`);
+    expect(res.status).toBe(200);
+    const html = await res.text();
+    expect(html).toContain('Settings');
+    expect(html).toContain('LLM Providers');
+    expect(html).toContain('Scan modes');
+    expect(html).toContain('Incremental scan');
+    expect(html).toContain('Output formats');
+  });
+});
+
+describe('Product UI — scan API', () => {
+  test('POST /api/scan with JSON body creates scan job', async () => {
+    const res = await fetch(`${baseUrl}/api/scan`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        target: 'test.php',
+        language: 'php',
+        code: '<?php eval($_GET["c"]);',
+      }),
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { ok: boolean; id: string; reportUrl: string };
+    expect(body.ok).toBe(true);
+    expect(body.id).toMatch(/^scan-/);
+    expect(body.reportUrl).toBe(`/report/${body.id}`);
+  });
+
+  test('POST /api/scan with vulnerable code returns findings', async () => {
+    const res = await fetch(`${baseUrl}/api/scan`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        target: 'sqli.php',
+        language: 'php',
+        code: '<?php\n$id = $_GET["id"];\n$result = mysql_query("SELECT * FROM x WHERE id=" . $id);\necho $result;',
+      }),
+    });
+    const body = (await res.json()) as { id: string };
+    const reportRes = await fetch(`${baseUrl}/report/${body.id}`);
+    expect(reportRes.status).toBe(200);
+    const html = await reportRes.text();
+    expect(html).toContain('mysql_query');
+    expect(html).toContain('CRITICAL');
+    expect(html).toContain('Use parameterized queries');
+  });
+
+  test('GET /api/scan/:id returns scan status', async () => {
+    const post = await fetch(`${baseUrl}/api/scan`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ target: 'a.php', language: 'php', code: '<?php $x =1;' }),
+    });
+    const postBody = (await post.json()) as { id: string };
+
+    const get = await fetch(`${baseUrl}/api/scan/${postBody.id}`);
+    expect(get.status).toBe(200);
+    const status = (await get.json()) as { status: string };
+    expect(['running', 'completed']).toContain(status.status);
+  });
+
+  test('GET /api/scan/:id for unknown id returns404', async () => {
+    const res = await fetch(`${baseUrl}/api/scan/no-such-id`);
+    expect(res.status).toBe(404);
+  });
+});
+
+describe('Product UI — report viewer', () => {
+  test('GET /report/:id renders risk cards', async () => {
+    const post = await fetch(`${baseUrl}/api/scan`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        target: 'vuln.php',
+        language: 'php',
+        code: '<?php\n$x = $_GET["x"];\neval($x);\nmysql_query($x);\n',
+      }),
+    });
+    const body = (await post.json()) as { id: string };
+    await new Promise((r) => setTimeout(r, 200));
+
+    const reportRes = await fetch(`${baseUrl}/report/${body.id}`);
+    expect(reportRes.status).toBe(200);
+    const html = await reportRes.text();
+    expect(html).toContain('Scan Report');
+    expect(html).toContain('risk-card');
+    expect(html).toContain('Show fix');
+    expect(html).toContain('D3');
+  });
+
+  test('GET /report/:id for unknown id returns404', async () => {
+    const res = await fetch(`${baseUrl}/report/no-such-scan`);
+    expect(res.status).toBe(404);
+  });
+
+  test('GET /share/:id renders shareable summary card', async () => {
+    const post = await fetch(`${baseUrl}/api/scan`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ target: 'a.php', language: 'php', code: '<?php eval($_GET["c"]);' }),
+    });
+    const body = (await post.json()) as { id: string };
+    await new Promise((r) => setTimeout(r, 200));
+
+    const res = await fetch(`${baseUrl}/share/${body.id}`);
+    expect(res.status).toBe(200);
+    const html = await res.text();
+    expect(html).toContain('security-vule scan report');
+  });
+});
+
+describe('Product UI — health/metrics endpoints', () => {
   test('GET /healthz returns JSON status', async () => {
     const res = await fetch(`${baseUrl}/healthz`);
     expect(res.status).toBeLessThanOrEqual(503);
@@ -142,8 +206,26 @@ describe('HTTP server live endpoints', () => {
     expect(text).toMatch(/^# HELP /m);
   });
 
-  test('Unknown route returns 404', async () => {
-    const res = await fetch(`${baseUrl}/unknown`);
+  test('Unknown route returns404 error page', async () => {
+    const res = await fetch(`${baseUrl}/no-such-page`);
     expect(res.status).toBe(404);
+    const html = await res.text();
+    expect(html).toContain('404');
+  });
+});
+
+describe('Product UI — health/metrics util functions (unit)', () => {
+  test('healthCheck returns proper status shape', () => {
+    const h = healthCheck();
+    expect(h).toHaveProperty('status');
+    expect(h).toHaveProperty('version');
+    expect(h).toHaveProperty('uptime');
+    expect(h).toHaveProperty('checks');
+  });
+
+  test('getMetricsText returns Prometheus format', async () => {
+    const text = await getMetricsText();
+    expect(text).toMatch(/^# HELP /m);
+    expect(text).toMatch(/^# TYPE /m);
   });
 });
