@@ -362,4 +362,64 @@ security-vule 采用 **AGPL-3.0** 许可证发布——详见 [LICENSE](LICENSE)
 
 由 security-vule 团队用 🌌 打造
 
+## 🌟 新增能力 (2026-06 evolution)
+
+### 🎯 P0 —核心能力扩展
+
+|能力 | 文件 | 说明 |
+|------|------|------|
+| **Web UI完整化** | `src/integration/commands/server.ts` | POST `/api/report` + GET `/report`渲染交互式 D3风险星图 + Plotly雷达图; Dashboard拖拽上传 |
+| **OWASP Agentic Top10 (2026)** | `src/llm/owasp-agentic.ts` | ASI01-ASI10,32 种 pattern,每条带 CWE编号 +修复建议 |
+| **MCP server实际化** | `src/mcp/server.ts` |7 tools +3 resources +5 spec-driven prompts |
+
+### 🚀 P1 — 工程化提升
+
+|能力 | 文件 | 说明 |
+|------|------|------|
+| **VQL 查询语言** | `src/engine/cpg/vql.ts` | 类 MATE MQL 的声明式 CPG 查询 (8 predicates +4 combinators + reachability) |
+| **6阶段工作流** | `src/engine/workflow.ts` | SPEC→PLAN→BUILD→TEST→REVIEW→SHIP,支持 skip/resume/hook |
+| **`vule workflow` CLI** | `src/integration/commands/workflow.ts` | `--llm --owasp --poc --stage N --skip N --resume N --json` |
+
+### 🔒 P2 — 安全隔离
+
+|能力 | 文件 | 说明 |
+|------|------|------|
+| **PocSandbox** | `src/poc/sandbox.ts` | TypeScript 原生,3 种隔离 (process/docker/mock), 自动登录 + retry |
+| **SKILL.md扫描** | `src/skill/scanner.ts` | Claude Code plugin 安全检查,10 种危险模式 +工具权限评分 +5 级风险 |
+| **5 个 spec-driven prompts** | `src/mcp/server.ts` | `spec-driven-vuln-fix` / `owasp-agentic-audit` / `skill-md-review` / `poc-verify` |
+
+### 🌀 P3 —持续化
+
+|能力 | 文件 | 说明 |
+|------|------|------|
+| **VuleDaemon** | `src/daemon/vule-daemon.ts` | ralph-loop持久化守护, 文件监听 + baseline diff + Unix socket +事件回调 |
+| **IncrementalScanner** | `src/scanner/incremental.ts` | CodeQL风格增量分析,仅扫描变更文件,5-10x性能提升 |
+
+### 📊 测试统计
+
+|阶段 | 测试 | 文件 |提交 |
+|------|------|------|------|
+|起点 (v1.0.0) |820 |95 | - |
+| P0 (Web + OWASP + MCP) | +32 |96 | `5a83b4b` |
+| P1 (VQL + Workflow) | +32 |98 | `aecec06` |
+| P2 (Sandbox + SKILL + Prompts) | +30 |100 | `c3506cd` |
+| P3 (Daemon + Incremental) | +23 |102 | (本提交) |
+| **当前总计** | **937** | **102** | **+1177 lines** |
+
+### 🔌外部参考方案
+
+|能力 | 参考项目 | Star 数 |
+|------|----------|---------|
+| CPG | GaloisInc/MATE |195 |
+| Agent 安全 | HeadyZhang/agent-audit |183 |
+| Claude Code skills | athola/claude-night-market |305 |
+| SKILL.md扫描 | theinfosecguy/razin |15 |
+| SkillScan沙箱 | NMitchem/SkillScan |3 |
+| Multi-agent 工作流 | Snowflake-Labs/cocoplus |597 |
+| AI Agent Governance | microsoft/agent-governance-toolkit |4186 |
+| Pentest MCP |0xSteph/pentest-ai |710 |
+| Claude Code OWASP | agamm/claude-code-owasp |229 |
+| Persistent daemon | zclllyybb/OpenGiraffe |98 |
+| GitHub CodeQL | github/codeql-action |1700+ |
+
 </div>
