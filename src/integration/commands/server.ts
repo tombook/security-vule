@@ -35,6 +35,8 @@ import {
   renderShareCard,
   renderErrorPage,
 } from './ui/pages.js';
+import { VuleSandboxBridge, reportToMarkdown } from '../../poc/vule-sandbox-bridge.js';
+import type { BridgeReport } from '../../poc/vule-sandbox-bridge.js';
 
 export interface ServerOptions {
   port: number;
@@ -53,6 +55,7 @@ interface ScanJob {
 
 const scanJobs: Map<string, ScanJob> = new Map();
 let latestReport: VuleReport | null = null;
+let latestBridgeReport: BridgeReport | null = null;
 
 export async function serverCommand(options: ServerOptions): Promise<void> {
   const port = options.port;
@@ -139,6 +142,41 @@ export async function serverCommand(options: ServerOptions): Promise<void> {
           if (!latestReport) return new Response('No report submitted', { status: 404 });
           return new Response(generateHTMLReport(latestReport), {
             headers: { 'content-type': 'text/html; charset=utf-8' },
+          });
+        }
+
+        if (url.pathname === '/api/poc/verify' && req.method === 'POST') {
+          return await handlePocVerify(req);
+        }
+
+        if (url.pathname === '/api/poc/report' && req.method === 'GET') {
+          if (!latestBridgeReport)
+            return Response.json(
+              { error: 'no poc report yet. POST /api/poc/verify first' },
+              { status: 404 }
+            );
+          return Response.json({
+            generatedAt: latestBridgeReport.generatedAt,
+            totalVulns: latestBridgeReport.totalVulns,
+            verifiedVulns: latestBridgeReport.verifiedVulns,
+            verificationRate: latestBridgeReport.verificationRate,
+            uvrsDistribution: latestBridgeReport.uvrsDistribution,
+            verifications: latestBridgeReport.verifications.map((v) => ({
+              id: v.id,
+              vulnType: v.vulnType,
+              target: v.target,
+              verified: v.verified,
+              confidence: v.confidence,
+              attempts: v.attempts,
+              successes: v.successes,
+            })),
+          });
+        }
+
+        if (url.pathname === '/api/poc/report/markdown' && req.method === 'GET') {
+          if (!latestBridgeReport) return new Response('No POC report yet', { status: 404 });
+          return new Response(reportToMarkdown(latestBridgeReport), {
+            headers: { 'content-type': 'text/markdown; charset=utf-8' },
           });
         }
 
@@ -364,6 +402,33 @@ async function runScan(job: ScanJob, code?: string): Promise<void> {
     job.status = 'failed';
     job.error = (e as Error).message;
     job.finishedAt = Date.now();
+  }
+}
+
+async function handlePocVerify(req: Request): Promise<Response> {
+  try {
+    const body = (await req.json().catch(() => ({}))) as { targets?: string[] };
+    const targets = body.targets as ('dvwa' | 'bwapp' | 'sqlilabs' | 'pikachu')[] | undefined;
+    const bridge = new VuleSandboxBridge({ targets });
+    const verifications = await bridge.verifyAll();
+    const report = bridge.generateReport();
+    latestBridgeReport = report;
+    return Response.json({
+      ok: true,
+      totalVulns: report.totalVulns,
+      verifiedVulns: report.verifiedVulns,
+      verificationRate: report.verificationRate,
+      uvrsDistribution: report.uvrsDistribution,
+      results: verifications.map((v) => ({
+        id: v.id,
+        vulnType: v.vulnType,
+        target: v.target,
+        verified: v.verified,
+        confidence: v.confidence,
+      })),
+    });
+  } catch (e) {
+    return Response.json({ error: (e as Error).message }, { status: 500 });
   }
 }
 
