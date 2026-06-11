@@ -66,7 +66,7 @@ bWAPP, sqli-labs, Pikachu).
 | 🔒 **AI Security** | 4-layer prompt-injection defense + 17-pattern secret redaction |
 | 🚀 **CI/CD** | GitHub Actions + GitLab CI + Docker multi-arch + release-please |
 | 📈 **Observability** | pino + OpenTelemetry + 13 Prometheus metrics + /healthz |
-| 📚 **Engineering grade A** | 948 tests, 73% coverage, 0 `any` types, 0 TypeScript errors |
+| 📚 **Engineering grade A** | 1011 tests, 73% coverage, 0 `any` types, 0 TypeScript errors |
 
 ---
 
@@ -364,7 +364,7 @@ See [docs/architecture/c4-model.md](docs/architecture/c4-model.md) for full 4-le
 | **TypeScript errors** | 0 |
 | **ESLint errors** | 0 |
 | **`any` types in src/** | 0 (was 23 in v0.3) |
-| **Build time** | 2.81s (948 tests) |
+| **Build time** | 2.81s (1011 tests) |
 | **CLI startup** | < 50ms |
 | **100-node CPG** | < 1s |
 | **500-node CPG** | < 7s |
@@ -439,3 +439,17 @@ service, etc.), contact **licensing@security-vule.org**.
 Made with 🌌 by the security-vule team
 
 </div>
+
+## 🤖 Anthropic Harness-inspired capabilities
+
+Inspired by [anthropics/defending-code-reference-harness](https://github.com/anthropics/defending-code-reference-harness) (5688 ⭐):
+
+| Capability | security-vule equivalent | File |
+|------------|--------------------------|------|
+| `/threat-model` skill | MCP `threat-model` prompt + `src/threatmodel/threat-model.ts` generates structured `THREAT_MODEL.md` | `src/threatmodel/threat-model.ts` |
+| `/triage` skill | MCP `triage-and-patch` prompt + `src/triage/triage.ts` (dedupe + known-bug suppression + severity recalibration + voting) | `src/triage/triage.ts` |
+| `/patch` skill | `src/patch/patcher.ts` (11 patch rules for SQLi/XSS/eval/RCE/LFI/etc., auto-verify) | `src/patch/patcher.ts` |
+| Dedupe via fingerprint | SHA-256 fingerprint of `file:line:vulnType` | `fingerprintFinding()` |
+| Threat-model severity recalibration | Promote/demote based on internet-facing / internal / critical asset / PII | `recalibrateSeverity()` |
+
+**Result**:1011 tests pass (was948 → +63 new tests).0 TS errors.0 ESLint errors.

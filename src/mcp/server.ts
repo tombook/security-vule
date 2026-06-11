@@ -248,6 +248,36 @@ const PROMPTS: Array<{
       { name: 'payload', description: 'PoC payload string', required: true },
     ],
   },
+  {
+    name: 'threat-model',
+    description: 'Anthropic Harness /threat-model skill. Generates structured THREAT_MODEL.md.',
+    arguments: [
+      { name: 'project_name', description: 'Project name', required: true },
+      { name: 'language', description: 'Programming language', required: true },
+      { name: 'source_files', description: 'JSON array of {path, lines} entries', required: true },
+      { name: 'entry_points', description: 'JSON array of entry point paths', required: false },
+      { name: 'data_stores', description: 'JSON array of data store identifiers', required: false },
+    ],
+  },
+  {
+    name: 'triage-and-patch',
+    description:
+      'Anthropic Harness /triage + /patch. Dedupe findings across runs, recalibrate against threat model, generate + verify patches.',
+    arguments: [
+      { name: 'findings_json', description: 'JSON array of findings', required: true },
+      { name: 'language', description: 'PHP | Python | JavaScript | TypeScript', required: true },
+      {
+        name: 'known_bugs_json',
+        description: 'Optional JSON array of known bugs to suppress',
+        required: false,
+      },
+      {
+        name: 'threat_model_json',
+        description: 'Optional JSON threat model for recalibration',
+        required: false,
+      },
+    ],
+  },
 ];
 
 const kb = new VulnerabilityKnowledgeBase();
@@ -523,6 +553,16 @@ Steps:
       return {
         messages: [{ role: 'user', content: { type: 'text', text } }],
       };
+    }
+    if (name === 'threat-model') {
+      const project = (args.project_name as string) ?? 'unknown-project';
+      const lang = (args.language as string) ?? 'php';
+      const text = `Generate a THREAT_MODEL.md for '${project}' (${lang}). Use tool threat_model to generate structured markdown. Save to THREAT_MODEL.md.`;
+      return { messages: [{ role: 'user', content: { type: 'text', text } }] };
+    }
+    if (name === 'triage-and-patch') {
+      const text = `Anthropic Harness /triage + /patch. Dedupe findings, recalibrate severity, generate verified patches via src/patch/patcher.ts.`;
+      return { messages: [{ role: 'user', content: { type: 'text', text } }] };
     }
     throw new Error(`Unknown prompt: ${name}`);
   }

@@ -46,7 +46,7 @@ describe('MCP Server — protocol methods', () => {
     expect(uris).toHaveLength(3);
   });
 
-  test('prompts/list returns5 spec-driven prompts', async () => {
+  test('prompts/list returns7 spec-driven prompts (Anthropic Harness-compatible)', async () => {
     const res = await route(new MCPServer())({ jsonrpc: '2.0', id: 500, method: 'prompts/list' });
     const result = res.result as { prompts: Array<{ name: string }> };
     const names = result.prompts.map((p) => p.name);
@@ -55,7 +55,7 @@ describe('MCP Server — protocol methods', () => {
     expect(names).toContain('owasp-agentic-audit');
     expect(names).toContain('skill-md-review');
     expect(names).toContain('poc-verify');
-    expect(names).toHaveLength(5);
+    expect(names).toHaveLength(7);
   });
 
   test('unknown method returns -32601 error', async () => {
@@ -191,5 +191,41 @@ describe('MCP Server — prompts/get', () => {
     } catch (e) {
       expect((e as Error).message).toContain('Unknown prompt');
     }
+  });
+});
+
+describe('MCP Server — Anthropic Harness prompts', () => {
+  const getPrompt = async (name: string, args: Record<string, unknown>) => {
+    const res = await route(new MCPServer())({
+      jsonrpc: '2.0',
+      id: 700,
+      method: 'prompts/get',
+      params: { name, arguments: args },
+    });
+    return (
+      (res.result as { messages: Array<{ content: { text: string } }> }).messages[0]?.content
+        .text ?? ''
+    );
+  };
+
+  test('threat-model prompt mentions THREAT_MODEL.md sections', async () => {
+    const text = await getPrompt('threat-model', {
+      project_name: 'demo',
+      language: 'php',
+      source_files: '[{"path":"a.php","lines":100}]',
+      entry_points: '["/api"]',
+      data_stores: '["mysql:db"]',
+    });
+    expect(text).toContain('THREAT_MODEL.md');
+    expect(text).toContain('structured markdown');
+  });
+
+  test('triage-and-patch prompt mentions dedupe + patch verification', async () => {
+    const text = await getPrompt('triage-and-patch', {
+      findings_json:
+        '[{"id":"1","file":"a.php","line":5,"vulnType":"SQL Injection","severity":"CRITICAL","uvrs":0.95}]',
+      language: 'php',
+    });
+    expect(text).toContain('Dedupe');
   });
 });
