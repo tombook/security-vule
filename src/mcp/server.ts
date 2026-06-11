@@ -206,10 +206,46 @@ const PROMPTS: Array<{
   {
     name: 'security-review',
     description:
-      'Multi-step guided security review: 1) run threat_model, 2) scan_code, 3) owasp_agentic_scan, 4) attack_surface.',
+      'Multi-step guided security review:1) run threat_model,2) scan_code,3) owasp_agentic_scan,4) attack_surface.',
     arguments: [
       { name: 'code', description: 'Source code to review', required: true },
       { name: 'language', description: 'Programming language', required: false },
+    ],
+  },
+  {
+    name: 'spec-driven-vuln-fix',
+    description:
+      'Spec-driven vulnerability fix workflow: spec → plan → build → test → review → ship.',
+    arguments: [
+      {
+        name: 'finding',
+        description: 'Vulnerability finding (type, file:line, severity)',
+        required: true,
+      },
+      { name: 'language', description: 'Programming language', required: true },
+    ],
+  },
+  {
+    name: 'owasp-agentic-audit',
+    description: 'Full OWASP Agentic AI Top10 (2026) audit with risk prioritization.',
+    arguments: [{ name: 'code', description: 'Agent source code to audit', required: true }],
+  },
+  {
+    name: 'skill-md-review',
+    description: 'Review a SKILL.md / Claude Code plugin for security risks.',
+    arguments: [{ name: 'skill_content', description: 'SKILL.md file contents', required: true }],
+  },
+  {
+    name: 'poc-verify',
+    description: 'Generate and run a PoC exploit against a target with sandbox isolation.',
+    arguments: [
+      { name: 'finding_type', description: 'SQLi | XSS | RCE | LFI | SSRF | ...', required: true },
+      {
+        name: 'target',
+        description: 'Target identifier (dvwa, bwapp, sqlilabs, pikachu, mock)',
+        required: true,
+      },
+      { name: 'payload', description: 'PoC payload string', required: true },
     ],
   },
 ];
@@ -393,7 +429,7 @@ Steps (run each in order):
 2. Call tool \`scan_code\` to find CWE-mapped vulnerabilities.
 3. Call tool \`owasp_agentic_scan\` to detect agentic AI risks (ASI01..ASI10).
 4. Call tool \`attack_surface\` to enumerate trust-boundary crossings.
-5. Summarize findings: top 5 issues ranked by UVRS-equivalent severity, with concrete fixes.`;
+5. Summarize findings: top5 issues ranked by UVRS-equivalent severity, with concrete fixes.`;
       return {
         messages: [
           {
@@ -401,6 +437,91 @@ Steps (run each in order):
             content: { type: 'text', text },
           },
         ],
+      };
+    }
+    if (name === 'spec-driven-vuln-fix') {
+      const finding = (args.finding as string) ?? '(no finding provided)';
+      const lang = (args.language as string) ?? 'php';
+      const text = `Spec-driven vulnerability fix workflow for this ${lang} finding:
+
+Finding: ${finding}
+
+Execute the6-stage workflow:
+
+1. **SPEC** — Restate the finding precisely (CWE, severity, line, code excerpt). Identify the trust boundary crossed.
+2. **PLAN** — Choose fix strategy: parameterized query? input validation? output encoding? Safe API? Select2 alternatives.
+3. **BUILD** — Apply the fix. Ensure no regression of existing functionality. Add a regression test.
+4. **TEST** — Run the existing test suite. Run the new regression test. Run tool \`scan_code\` to confirm finding is gone.
+5. **REVIEW** — Have a second pass reviewer (call tool \`threat_model\` again) verify the fix doesn't introduce new issues.
+6. **SHIP** — Output: (a) the diff, (b) the regression test code, (c) the post-fix scan_code result confirming finding removed, (d) CWE mapping.`;
+      return {
+        messages: [{ role: 'user', content: { type: 'text', text } }],
+      };
+    }
+    if (name === 'owasp-agentic-audit') {
+      const code = (args.code as string) ?? '';
+      const text = `Perform a full OWASP Agentic AI Top10 (2026) audit.
+
+Agent source code:
+\`\`\`
+${code}
+\`\`\`
+
+Steps:
+1. Call tool \`owasp_agentic_scan\` to detect ASI01..ASI10 violations.
+2. Read resource \`agentic://top10\` for the full rule catalog.
+3. For each critical/high finding, output:
+ - ASI ID + title + severity
+ - Vulnerable line + snippet
+ - Attack scenario (how an attacker would exploit)
+ - Concrete fix + secure code example
+4. Final verdict: is this agent safe to deploy? (yes/no + justification)`;
+      return {
+        messages: [{ role: 'user', content: { type: 'text', text } }],
+      };
+    }
+    if (name === 'skill-md-review') {
+      const skill = (args.skill_content as string) ?? '';
+      const text = `Review this Claude Code plugin / SKILL.md file for security risks:
+
+\`\`\`
+${skill}
+\`\`\`
+
+The scanner detects:
+- Dangerous shell patterns (curl | sh, rm -rf /, chmod +x && ./)
+- Data exfiltration (curl --data @file, base64 -d | sh)
+- Excessive allowed-tools (Bash + Write + WebFetch + Task)
+- Hidden Unicode (zero-width chars) / prompt injection
+- Hardcoded secrets
+
+Steps:
+1. Parse frontmatter (name, description, allowed-tools).
+2. Run the scanner on body content.
+3. Report risk level (safe/low/medium/high/critical) + top3 issues + fixes.
+4. If riskLevel >= medium, recommend either: (a) narrow allowed-tools, (b) split into separate skills, (c) reject.`;
+      return {
+        messages: [{ role: 'user', content: { type: 'text', text } }],
+      };
+    }
+    if (name === 'poc-verify') {
+      const type = (args.finding_type as string) ?? 'sqli';
+      const target = (args.target as string) ?? 'mock';
+      const payload = (args.payload as string) ?? "' OR '1'='1";
+      const text = `Generate and run a PoC exploit with sandbox isolation.
+
+- Finding type: ${type}
+- Target: ${target}
+- Payload: ${payload}
+
+Steps:
+1. Construct a PoC HTTP request targeting the finding type.
+2. Run via \`PocSandbox\` with isolation='docker' (or 'mock' for testing).
+3. Validate response contains expected indicators (e.g. SQLi: error message + user dump).
+4. Record: success/failure, response time, status code, matched expectations.
+5. Output: (a) curl command, (b) sandbox invocation, (c) result.`;
+      return {
+        messages: [{ role: 'user', content: { type: 'text', text } }],
       };
     }
     throw new Error(`Unknown prompt: ${name}`);
