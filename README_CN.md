@@ -72,6 +72,21 @@ bun --bun src/integration/vule-cli.ts analyze ./test-targets/php-vulns/
 
 # LLM 增强扫描（更高召回率，约 50 秒/文件）
 export MINIMAX_API_KEY="sk-cp-..."  # 或 ZHIPU_API_KEY、ANTHROPIC_API_KEY、OPENAI_API_KEY
+
+#增量扫描（CodeQL风格 delta，缓存命中5-10x加速）
+bun --bun src/integration/vule-cli.ts analyze ./test-targets/ --incremental --cache .vule/cache.json
+
+#6阶段 multi-agent 工作流
+bun --bun src/integration/vule-cli.ts workflow ./test-targets/php-vulns/ --llm --owasp --stage BUILD
+
+#持久化守护（ralph-loop监听器 + Unix socket IPC）
+bun --bun src/integration/vule-cli.ts daemon start -w ./test-targets/ -s /tmp/vule.sock
+#另一终端：
+echo "STATE" | nc -U /tmp/vule.sock
+echo "SCAN php-vulns/test.php" | nc -U /tmp/vule.sock
+echo "STOP" | nc -U /tmp/vule.sock
+
+export MINIMAX_API_KEY="sk-cp-..." # 或 ZHIPU_API_KEY、ANTHROPIC_API_KEY、OPENAI_API_KEY
 bun --bun scripts/llm-scan.ts --mode failover --max-findings 5 --verify test-targets/php-vulns/
 
 # 列出全部 29 个维度
@@ -192,28 +207,62 @@ security-vule 自身就是一个 AI 系统，面临以下威胁与防御：
 ## 🖥️ CLI 命令
 
 ```bash
-vule analyze <path>           # 主分析（AST + LLM）
-vule dimension <name> <file>  # 运行单一维度检测器
-vule visualize <report.html>  # 在浏览器中打开 HTML 报告
-vule server --port 3000       # 启动 Web UI 服务（/healthz、/metrics）
-vule list-dimensions          # 列出全部 29 个维度
+vule analyze <path> [--incremental] [--cache <path>]
+ # 主分析（AST + LLM）。--incremental: CodeQL风格增量扫描（5-10x加速）
+
+vule daemon start|stop|status [-w <dir>] [-s <socket>] [-b <baseline>] [--json]
+ #持久化守护（ralph-loop）。Unix socket IPC，支持 STATE/SCAN/STOP 命令
+
+vule workflow <target> [--llm] [--owasp] [--poc] [--stage N] [--skip N] [--resume N] [--json]
+ #6阶段 multi-agent评审（spec→plan→build→test→review→ship）
+
+vule dimension <name> <file> # 运行单一维度检测器
+vule visualize <report.html> # 在浏览器中打开 HTML报告
+vule server --port3000 #启动 Web UI 服务（/healthz、/metrics、/report）
+vule list-dimensions #列出全部29个维度
 ```
+
+### MCP Server（Model Context Protocol）
+
+security-vule 自带 MCP server（`bun --bun src/mcp/server.ts`），让 AI agents（Claude Code、Cursor、Continue 等）可以将漏洞检测调用为工具：
+
+| 类型 |数量 |名称 |
+|------|------:|------|
+|工具 (Tools) |7 | `scan_code` · `scan_file` · `list_rules` · `lookup_cwe` · `threat_model` · `attack_surface` · `owasp_agentic_scan` |
+|资源 (Resources) |3 | `security-vule://rules` · `agentic://top10` · `security-vule://stats` |
+|提示 (Prompts) |5 | `security-review` · `spec-driven-vuln-fix` · `owasp-agentic-audit` · `skill-md-review` · `poc-verify` |
 
 **库 API**（TypeScript）：
 
 ```typescript
-import { VuleEngine, CPGBuilder } from 'security-vule';
-import { CPGBuilder } from 'security-vule/src/engine/cpg/builder.js';
+import { VuleEngine, CPGBuilder, query, predicates, Workflow, PocSandbox, VuleDaemon, IncrementalScanner } from 'security-vule';
 
-// 1. 从源代码构建 CPG
+//1. 从源代码构建 CPG +运行 VuleEngine (全部29维度)
 const cpg = new CPGBuilder('php', 'test.php').build(programGraph);
-
-// 2. 用全部 29 个维度运行 VuleEngine
 const engine = new VuleEngine(cpg, cpg.sinkNodes().map(n => n.id));
 const report = engine.analyze();
 
-// 3. 输出 UVRS 评分最高的节点
-console.log(report.topRisk);
+//2. VQL声明式查询 (MATE风格)
+const sinks = query(cpg)
+ .where('expr', predicates.nodeType('expr'))
+ .and(predicates.isSink('php'))
+ .execute();
+
+//3.6阶段工作流
+const wf = new Workflow({ target: 'app.php', language: 'php', enableLlm: true });
+const summary = await wf.runAll();
+
+//4.沙箱 PoC 执行 (process | docker | mock 三种隔离)
+const sandbox = new PocSandbox({ target: 'dvwa', isolation: 'docker' });
+const result = await sandbox.execute({ method: 'GET', url: '/vuln', expected: { contains: 'admin' } });
+
+//5. CodeQL风格增量扫描
+const scanner = new IncrementalScanner({ sourceDir: '/app', cachePath: '.vule/cache.json', scanFile });
+const delta = await scanner.scan(); // { added, modified, unchanged, deleted, cacheHitRate }
+
+//6.持久化守护 (ralph-loop监听器)
+const daemon = new VuleDaemon({ watchDir: '/app', socketPath: '/tmp/vule.sock' });
+await daemon.start();
 ```
 
 5 个可运行示例见 [examples/](examples/)。
@@ -395,6 +444,14 @@ security-vule 采用 **AGPL-3.0** 许可证发布——详见 [LICENSE](LICENSE)
 | **VuleDaemon** | `src/daemon/vule-daemon.ts` | ralph-loop持久化守护, 文件监听 + baseline diff + Unix socket +事件回调 |
 | **IncrementalScanner** | `src/scanner/incremental.ts` | CodeQL风格增量分析,仅扫描变更文件,5-10x性能提升 |
 
+### 🛠️ P4 — CLI集成
+
+|能力 | 文件 | 说明 |
+|------|------|------|
+| **`vule daemon` CLI** | `src/integration/commands/daemon.ts` | start/stop/status命令, Unix socket IPC, JSON输出 |
+| **`vule analyze --incremental`** | `src/integration/commands/analyze.ts` | CodeQL风格 delta扫描,缓存命中率报告, JSON导出 |
+| **CHANGELOG + SBOM** | `CHANGELOG.md`, `sbom.json` | v1.1.0条目,344-component CycloneDX1.5 SBOM重新生成 |
+
 ### 📊 测试统计
 
 |阶段 | 测试 | 文件 |提交 |
@@ -403,8 +460,9 @@ security-vule 采用 **AGPL-3.0** 许可证发布——详见 [LICENSE](LICENSE)
 | P0 (Web + OWASP + MCP) | +32 |96 | `5a83b4b` |
 | P1 (VQL + Workflow) | +32 |98 | `aecec06` |
 | P2 (Sandbox + SKILL + Prompts) | +30 |100 | `c3506cd` |
-| P3 (Daemon + Incremental) | +23 |102 | (本提交) |
-| **当前总计** | **937** | **102** | **+1177 lines** |
+| P3 (Daemon + Incremental) | +23 |102 | `7df0eb5` |
+| P4 (CLI集成) | +11 |104 | `c5d65fd` |
+| **当前总计** | **948** | **104** | **+1743 lines** |
 
 ### 🔌外部参考方案
 

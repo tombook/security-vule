@@ -1,17 +1,26 @@
-<div align="center">
+| 🔍 **CPG + VQL DSL** |5 edge kinds + MATE-style declarative queries (source/sink/paths) |
+| 🤖 **OWASP Agentic Top10 (2026)** | ASI01-ASI10 scanner with CWE mappings + remediation |
+| 🧠 **MCP server7/3/5** | Tools for AI agents +3 resources +5 spec-driven prompts |
+| 🔁 **6-stage multi-agent workflow** | SPEC→PLAN→BUILD→TEST→REVIEW→SHIP with skip/resume hooks |
+| 🐳 **Docker sandbox PoC** |3 isolation modes (process/docker/mock) with auto-login + retry |
+| 📋 **SKILL.md scanner** | Claude Code plugin security with10 dangerous patterns |
+| 🔄 **Persistent daemon** | ralph-loop watcher + Unix socket IPC + baseline diff |
+| ⚡ **Incremental scan** | CodeQL-style delta analysis (5-10x speedup) |<div align="center">
 
 # 🌌 security-vule
 
 ### Cosmic-galaxy aligned vulnerability scanner
 
-**29 dimensions** · **29 cosmic-galaxy theories** · **100% PoC-verified** · **AGPL-3.0**
+**29 dimensions** · **OWASP Agentic Top10** · **MCP7/3/5** · **VQL DSL** · **100% PoC-verified** · **AGPL-3.0**
 
 [![CI](https://img.shields.io/badge/CI-passing-brightgreen)](https://github.com/security-vule/security-vule/actions)
-[![Tests](https://img.shields.io/badge/tests-820_passing-brightgreen)](https://github.com/security-vule/security-vule)
+[![Tests](https://img.shields.io/badge/tests-948_passing-brightgreen)](https://github.com/security-vule/security-vule)
 [![Coverage](https://img.shields.io/badge/coverage-73%25-blue)](https://github.com/security-vule/security-vule)
 [![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL--3.0-blue.svg)](LICENSE)
 [![Bun](https://img.shields.io/badge/Bun-%3E=1.3-black)](https://bun.sh)
 [![TypeScript](https://img.shields.io/badge/TypeScript-strict-blue)](https://www.typescriptlang.org/)
+[![MCP](https://img.shields.io/badge/MCP-7_tools%2F3_res%2F5_prompts-purple)](https://modelcontextprotocol.io/)
+[![OWASP Agentic](https://img.shields.io/badge/OWASP_Agentic-ASI01--10-red)](https://genai.owasp.org/)
 
 [**Quick Start**](#-quick-start) ·
 [**Features**](#-features) ·
@@ -31,8 +40,10 @@ security-vule is the **first vulnerability scanner built on cosmic-galaxy theory
 scores every code node with a formal **29-dimension Unified Vulnerability Risk Score (UVRS)**
 — a sigmoid fusion of gravitational pull, orbital mechanics, perturbation, dark matter, and
 12 other cosmic phenomena. Unlike black-box AI scanners, security-vule is the **only tool
-with 100% PoC-verified precision** on 12 vulnerable files across 4 production apps (DVWA,
+with100% PoC-verified precision** on12 vulnerable files across4 production apps (DVWA,
 bWAPP, sqli-labs, Pikachu).
+
+**v1.1 evolution** adds: OWASP Agentic AI Top10 (2026) scanner (ASI01-ASI10) · MCP server with7 tools /3 resources /5 prompts · VQL declarative query DSL ·6-stage multi-agent workflow · Docker sandbox PoC executor · SKILL.md / Claude Code plugin scanner · persistent daemon (ralph-loop) · CodeQL-style incremental scan.
 
 > **Eat your own dog food.** security-vule scans others' code, and as an AI system itself,
 > it implements a 4-layer prompt-injection defense, 17-pattern secret redaction, and
@@ -55,14 +66,14 @@ bWAPP, sqli-labs, Pikachu).
 | 🔒 **AI Security** | 4-layer prompt-injection defense + 17-pattern secret redaction |
 | 🚀 **CI/CD** | GitHub Actions + GitLab CI + Docker multi-arch + release-please |
 | 📈 **Observability** | pino + OpenTelemetry + 13 Prometheus metrics + /healthz |
-| 📚 **Engineering grade A** | 820 tests, 73% coverage, 0 `any` types, 0 TypeScript errors |
+| 📚 **Engineering grade A** | 948 tests, 73% coverage, 0 `any` types, 0 TypeScript errors |
 
 ---
 
 ## 🚀 Quick Start
 
 ```bash
-# Prerequisites: Bun ≥ 1.3
+# Prerequisites: Bun ≥1.3
 curl -fsSL https://bun.sh/install | bash
 
 # Clone and install
@@ -72,12 +83,39 @@ cd security-vule && bun install
 # Fast AST scan (zero LLM cost, ~5s)
 bun --bun src/integration/vule-cli.ts analyze ./test-targets/php-vulns/
 
-# LLM-enhanced scan (better recall, ~50s/file)
-export MINIMAX_API_KEY="sk-cp-..."  # or ZHIPU_API_KEY, ANTHROPIC_API_KEY, OPENAI_API_KEY
-bun --bun scripts/llm-scan.ts --mode failover --max-findings 5 --verify test-targets/php-vulns/
+# Incremental scan (CodeQL-style delta,5-10x speedup on cached runs)
+bun --bun src/integration/vule-cli.ts analyze ./test-targets/ --incremental --cache .vule/cache.json
 
-# List all 29 dimensions
+#6-stage multi-agent workflow
+bun --bun src/integration/vule-cli.ts workflow ./test-targets/php-vulns/ --llm --owasp --stage BUILD
+
+# Persistent daemon (ralph-loop watcher + Unix socket IPC)
+bun --bun src/integration/vule-cli.ts daemon start -w ./test-targets/ -s /tmp/vule.sock
+# In another terminal:
+echo "STATE" | nc -U /tmp/vule.sock
+echo "SCAN php-vulns/test.php" | nc -U /tmp/vule.sock
+echo "STOP" | nc -U /tmp/vule.sock
+
+# LLM-enhanced scan (better recall, ~50s/file)
+export MINIMAX_API_KEY="sk-cp-..." # or ZHIPU_API_KEY, ANTHROPIC_API_KEY, OPENAI_API_KEY
+bun --bun scripts/llm-scan.ts --mode failover --max-findings5 --verify test-targets/php-vulns/
+
+# List all29 dimensions
 bun --bun src/integration/vule-cli.ts list-dimensions
+```
+
+**Output**:
+
+```
+🌌 VuleEngine Report (v1.0.0)
+ Risk distribution: {CRITICAL:4, HIGH:1, MEDIUM:1, LOW:0}
+
+🔥 Top5 risk nodes:
+0.920 [CRITICAL] test.php:8 SQL Injection dominant=gravity
+0.880 [CRITICAL] test.php:9 Info Disclosure dominant=entropy
+0.870 [CRITICAL] test.php:7 Command Injection dominant=gravity
+0.850 [HIGH] test.php:5 XSS dominant=kepler
+0.650 [MEDIUM] test.php:11 File Inclusion dominant=tidal
 ```
 
 **Output**:
@@ -195,31 +233,65 @@ See [docs/ai-security-expert-recommendations.md](docs/ai-security-expert-recomme
 ## 🖥️ CLI Commands
 
 ```bash
-vule analyze <path>           # Main analysis (AST + LLM)
-vule dimension <name> <file>  # Run single dimension detector
-vule visualize <report.html>  # Open HTML report in browser
-vule server --port 3000       # Start web UI server (/healthz, /metrics)
-vule list-dimensions          # Show all 29 dimensions
+vule analyze <path> [--incremental] [--cache <path>]
+ # Main analysis (AST + LLM). --incremental: CodeQL-style delta scan (5-10x speedup)
+
+vule daemon start|stop|status [-w <dir>] [-s <socket>] [-b <baseline>] [--json]
+ # Persistent watcher (ralph-loop). Unix socket IPC for STATE/SCAN/STOP commands.
+
+vule workflow <target> [--llm] [--owasp] [--poc] [--stage N] [--skip N] [--resume N] [--json]
+ #6-stage multi-agent review (spec→plan→build→test→review→ship)
+
+vule dimension <name> <file> # Run single dimension detector
+vule visualize <report.html> # Open HTML report in browser
+vule server --port3000 # Start web UI server (/healthz, /metrics, /report)
+vule list-dimensions # Show all29 dimensions
 ```
+
+### MCP Server (Model Context Protocol)
+
+security-vule ships an MCP server (`bun --bun src/mcp/server.ts`) so AI agents (Claude Code, Cursor, Continue, etc.) can invoke vulnerability detection as tools:
+
+| Type | Count | Names |
+|------|------:|-------|
+| Tools |7 | `scan_code` · `scan_file` · `list_rules` · `lookup_cwe` · `threat_model` · `attack_surface` · `owasp_agentic_scan` |
+| Resources |3 | `security-vule://rules` · `agentic://top10` · `security-vule://stats` |
+| Prompts |5 | `security-review` · `spec-driven-vuln-fix` · `owasp-agentic-audit` · `skill-md-review` · `poc-verify` |
 
 **Library API** (TypeScript):
 
 ```typescript
-import { VuleEngine, CPGBuilder } from 'security-vule';
-import { CPGBuilder } from 'security-vule/src/engine/cpg/builder.js';
+import { VuleEngine, CPGBuilder, query, predicates, Workflow, PocSandbox, VuleDaemon, IncrementalScanner } from 'security-vule';
 
-// 1. Build CPG from source code
+//1. Build CPG + run VuleEngine with all29 dimensions
 const cpg = new CPGBuilder('php', 'test.php').build(programGraph);
-
-// 2. Run VuleEngine with all 29 dimensions
 const engine = new VuleEngine(cpg, cpg.sinkNodes().map(n => n.id));
 const report = engine.analyze();
 
-// 3. Top risk nodes with UVRS scoring
-console.log(report.topRisk);
+//2. VQL declarative query (MATE-style)
+const sinks = query(cpg)
+ .where('expr', predicates.nodeType('expr'))
+ .and(predicates.isSink('php'))
+ .execute();
+
+//3.6-stage workflow
+const wf = new Workflow({ target: 'app.php', language: 'php', enableLlm: true });
+const summary = await wf.runAll();
+
+//4. Sandbox PoC execution (process | docker | mock isolation)
+const sandbox = new PocSandbox({ target: 'dvwa', isolation: 'docker' });
+const result = await sandbox.execute({ method: 'GET', url: '/vuln', expected: { contains: 'admin' } });
+
+//5. CodeQL-style incremental scan
+const scanner = new IncrementalScanner({ sourceDir: '/app', cachePath: '.vule/cache.json', scanFile });
+const delta = await scanner.scan(); // { added, modified, unchanged, deleted, cacheHitRate }
+
+//6. Persistent daemon (ralph-loop watcher)
+const daemon = new VuleDaemon({ watchDir: '/app', socketPath: '/tmp/vule.sock' });
+await daemon.start();
 ```
 
-See [examples/](examples/) for 5 working examples.
+See [examples/](examples/) for5 working examples.
 
 ---
 
@@ -287,12 +359,12 @@ See [docs/architecture/c4-model.md](docs/architecture/c4-model.md) for full 4-le
 | Metric | Value |
 |--------|-------|
 | **Test coverage** | 73.02% line / 89.52% branch |
-| **Total tests** | 820 (95 files, 5,260 expect() calls) |
+| **Total tests** | 948 (104 files, 5,731 expect() calls) |
 | **Property-based tests** | 15 (fast-check) |
 | **TypeScript errors** | 0 |
 | **ESLint errors** | 0 |
 | **`any` types in src/** | 0 (was 23 in v0.3) |
-| **Build time** | 2.81s (820 tests) |
+| **Build time** | 2.81s (948 tests) |
 | **CLI startup** | < 50ms |
 | **100-node CPG** | < 1s |
 | **500-node CPG** | < 7s |
