@@ -35,6 +35,7 @@ export interface PocRequest {
   url: string;
   body?: string;
   headers?: Record<string, string>;
+  cookies?: Record<string, string>;
   expected: PocExpectation;
   timeoutMs?: number;
 }
@@ -46,6 +47,8 @@ export interface PocExpectation {
   containsUser?: string[];
   timeDelayMs?: number;
   baselineUrl?: string;
+  headerContains?: string;
+  headerMatches?: RegExp;
 }
 
 export type PocVerificationStatus =
@@ -329,9 +332,7 @@ export class PocSandbox {
     return Date.now() - baseStart;
   }
 
-  private async runWithRedirects(
-    req: PocRequest
-  ): Promise<{
+  private async runWithRedirects(req: PocRequest): Promise<{
     statusCode?: number;
     body?: string;
     headers?: Record<string, string>;
@@ -360,9 +361,15 @@ export class PocSandbox {
       const location = result.headers?.location;
       if (!location) return result;
 
-      const resolved = location.startsWith('http')
-        ? location
-        : `${this.target.baseUrl}${location.startsWith('/') ? '' : '/'}${location}`;
+      let resolved: string;
+      if (location.startsWith('http')) {
+        resolved = location;
+      } else if (location.startsWith('/')) {
+        resolved = `${this.target.baseUrl}${location}`;
+      } else {
+        const reqDir = fullUrl.substring(0, fullUrl.lastIndexOf('/') + 1);
+        resolved = `${reqDir}${location}`;
+      }
 
       currentReq = {
         ...currentReq,
@@ -383,7 +390,7 @@ export class PocSandbox {
   }
 
   private matches(
-    result: { statusCode?: number; body?: string },
+    result: { statusCode?: number; body?: string; headers?: Record<string, string> },
     expected: PocExpectation
   ): boolean {
     if (expected.statusCode !== undefined && result.statusCode !== expected.statusCode)
@@ -394,11 +401,23 @@ export class PocSandbox {
       const body = result.body.toLowerCase();
       if (!expected.containsUser.every((u) => body.includes(u.toLowerCase()))) return false;
     }
+    if (expected.headerContains) {
+      const headerStr = Object.entries(result.headers ?? {})
+        .map(([k, v]) => `${k}: ${v}`)
+        .join('\n');
+      if (!headerStr.includes(expected.headerContains)) return false;
+    }
+    if (expected.headerMatches) {
+      const headerStr = Object.entries(result.headers ?? {})
+        .map(([k, v]) => `${k}: ${v}`)
+        .join('\n');
+      if (!expected.headerMatches.test(headerStr)) return false;
+    }
     return true;
   }
 
   private matchedKeys(
-    result: { statusCode?: number; body?: string },
+    result: { statusCode?: number; body?: string; headers?: Record<string, string> },
     expected: PocExpectation
   ): string[] {
     const keys: string[] = [];
@@ -413,6 +432,18 @@ export class PocSandbox {
       expected.containsUser.every((u) => result.body!.toLowerCase().includes(u.toLowerCase()))
     ) {
       keys.push('containsUser');
+    }
+    if (expected.headerContains) {
+      const headerStr = Object.entries(result.headers ?? {})
+        .map(([k, v]) => `${k}: ${v}`)
+        .join('\n');
+      if (headerStr.includes(expected.headerContains)) keys.push('headerContains');
+    }
+    if (expected.headerMatches) {
+      const headerStr = Object.entries(result.headers ?? {})
+        .map(([k, v]) => `${k}: ${v}`)
+        .join('\n');
+      if (expected.headerMatches.test(headerStr)) keys.push('headerMatches');
     }
     return keys;
   }
@@ -429,10 +460,11 @@ export class PocSandbox {
       }
       for (const [k, v] of Object.entries(req.headers ?? {})) args.push('-H', `${k}: ${v}`);
       if (req.body) args.push('-d', req.body);
-      if (this.cookieJarPath && req.id === 'login') {
+      if (this.cookieJarPath) {
         args.push('-c', this.cookieJarPath);
       }
       for (const [k, v] of Object.entries(this.cookies)) args.push('-b', `${k}=${v}`);
+      for (const [k, v] of Object.entries(req.cookies ?? {})) args.push('-b', `${k}=${v}`);
       args.push(url);
 
       const proc = spawn('curl', args, { timeout: req.timeoutMs ?? 10000 });
