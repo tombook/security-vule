@@ -36,6 +36,7 @@ import {
   renderErrorPage,
 } from './ui/pages.js';
 import { VuleSandboxBridge, reportToMarkdown } from '../../poc/vule-sandbox-bridge.js';
+import { DomXssVerifier } from '../../poc/dom-xss-verifier.js';
 import type { BridgeReport } from '../../poc/vule-sandbox-bridge.js';
 
 export interface ServerOptions {
@@ -147,6 +148,10 @@ export async function serverCommand(options: ServerOptions): Promise<void> {
 
         if (url.pathname === '/api/poc/verify' && req.method === 'POST') {
           return await handlePocVerify(req);
+        }
+
+        if (url.pathname === '/api/poc/dom-xss' && req.method === 'POST') {
+          return await handleDomXssVerify(req);
         }
 
         if (url.pathname === '/api/poc/report' && req.method === 'GET') {
@@ -407,25 +412,56 @@ async function runScan(job: ScanJob, code?: string): Promise<void> {
 
 async function handlePocVerify(req: Request): Promise<Response> {
   try {
-    const body = (await req.json().catch(() => ({}))) as { targets?: string[] };
+    const body = (await req.json().catch(() => ({}))) as {
+      targets?: string[];
+      types?: string[];
+      detailed?: boolean;
+    };
     const targets = body.targets as ('dvwa' | 'bwapp' | 'sqlilabs' | 'pikachu')[] | undefined;
+    const typesFilter = body.types as string[] | undefined;
+    const detailed = body.detailed ?? false;
     const bridge = new VuleSandboxBridge({ targets });
-    const verifications = await bridge.verifyAll();
-    const report = bridge.generateReport();
+    const allVerifications = await bridge.verifyAll();
+    // Apply types filter if provided
+    const verifications = typesFilter
+      ? allVerifications.filter((v) => typesFilter.includes(v.vulnType))
+      : allVerifications;
+    const report = bridge.generateReport(verifications);
     latestBridgeReport = report;
+
+    // Per-status diagnostic breakdown
+    const statusBreakdown: Record<string, number> = {};
+    for (const v of verifications) {
+      const s = v.bestResult?.status ?? (v.verified ? 'verified' : 'unknown');
+      statusBreakdown[s] = (statusBreakdown[s] ?? 0) + 1;
+    }
+
     return Response.json({
       ok: true,
       totalVulns: report.totalVulns,
       verifiedVulns: report.verifiedVulns,
       verificationRate: report.verificationRate,
       uvrsDistribution: report.uvrsDistribution,
-      results: verifications.map((v) => ({
-        id: v.id,
-        vulnType: v.vulnType,
-        target: v.target,
-        verified: v.verified,
-        confidence: v.confidence,
-      })),
+      filters: { targets, types: typesFilter },
+      statusBreakdown,
+      results: verifications.map((v) => {
+        const base: Record<string, unknown> = {
+          id: v.id,
+          vulnType: v.vulnType,
+          target: v.target,
+          verified: v.verified,
+          confidence: v.confidence,
+        };
+        if (detailed) {
+          base.attempts = v.attempts;
+          base.successes = v.successes;
+          base.status = v.bestResult?.status ?? (v.verified ? 'verified' : 'no_match');
+          base.diagnostic = v.bestResult?.diagnostic ?? null;
+          base.matchedExpectations = v.bestResult?.matchedExpectations ?? [];
+          if (v.bestResult?.error) base.error = v.bestResult.error;
+        }
+        return base;
+      }),
     });
   } catch (e) {
     return Response.json({ error: (e as Error).message }, { status: 500 });
@@ -463,4 +499,58 @@ function html(body: string, status = 200): Response {
     status,
     headers: { 'content-type': 'text/html; charset=utf-8' },
   });
+}
+
+async function handleDomXssVerify(req: Request): Promise<Response> {
+  try {
+    const body = (await req.json().catch(() => ({}))) as {
+      baseUrl?: string;
+      targets?: Array<{
+        url: string;
+        inputSelector?: string;
+        triggerSelector?: string;
+        payload?: string;
+        domSelector?: string;
+        detectionMethod?: 'inner_html' | 'page_error' | 'console_log';
+        detectionPattern?: string;
+      }>;
+    };
+    const baseUrl = body.baseUrl ?? 'http://localhost:8083';
+    const targets = body.targets ?? [
+      {
+        url: '/vul/xss/xss_dom_x.php?text=DOMXSS_PW',
+        domSelector: 'body',
+        detectionMethod: 'inner_html' as const,
+        detectionPattern: 'DOMXSS_PW',
+      },
+    ];
+    const verifier = new DomXssVerifier({ baseUrl });
+    const results: unknown[] = [];
+    for (const t of targets) {
+      try {
+        const r = await verifier.verify({
+          id: `dom-xss-${Date.now()}`,
+          url: t.url,
+          inputSelector: t.inputSelector ?? 'input[name="text"]',
+          triggerSelector: t.triggerSelector ?? 'button,input[type=submit]',
+          payload: t.payload ?? 'DOMXSS_PW',
+          domSelector: t.domSelector ?? 'body',
+          detectionMethod: t.detectionMethod ?? 'inner_html',
+          detectionPattern: t.detectionPattern ?? 'DOMXSS_PW',
+        });
+        results.push(r);
+      } catch (e) {
+        results.push({ error: (e as Error).message });
+      }
+    }
+    await verifier.close();
+    return Response.json({
+      ok: true,
+      baseUrl,
+      results,
+      note: 'Playwright headless verification for DOM XSS — see src/poc/dom-xss-verifier.ts',
+    });
+  } catch (e) {
+    return Response.json({ error: (e as Error).message }, { status: 500 });
+  }
 }

@@ -213,13 +213,13 @@ export class VuleSandboxBridge {
     return this.uvrs.compute(components);
   }
 
-  generateReport(): BridgeReport {
-    const verifications = Array.from(this.verifications.values());
-    const verified = verifications.filter((v) => v.verified);
+  generateReport(verifications?: VulnerabilityVerification[]): BridgeReport {
+    const all = verifications ?? Array.from(this.verifications.values());
+    const verified = all.filter((v) => v.verified);
     const uvrsResults = new Map<string, UVRSResult>();
     const scores: number[] = [];
 
-    for (const v of verifications) {
+    for (const v of all) {
       const result = this.mapToUVRS(v);
       uvrsResults.set(v.id, result);
       scores.push(result.score);
@@ -229,10 +229,10 @@ export class VuleSandboxBridge {
 
     return {
       generatedAt: new Date().toISOString(),
-      totalVulns: verifications.length,
+      totalVulns: all.length,
       verifiedVulns: verified.length,
-      verificationRate: verifications.length > 0 ? verified.length / verifications.length : 0,
-      verifications,
+      verificationRate: all.length > 0 ? verified.length / all.length : 0,
+      verifications: all,
       uvrsResults,
       uvrsDistribution: distribution,
     };

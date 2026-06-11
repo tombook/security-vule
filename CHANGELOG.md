@@ -5,6 +5,57 @@ All notable changes to security-vule will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.9.0] -2026-06-12
+
+### Added
+- **bWAPP payload database**: 28 entries (RCE×4, SQLi×11, LFI×2, XSS×3, Upload, SSRF, LDAP, Unserialize, Open Redirect, xss-eval, phpi, HRS, HPP) — 21/28 = 75% verified in Docker
+- **PoC API enhancements**: `POST /api/poc/verify` now supports
+  - `types` filter (e.g. `["rce"]`) to run only specified injection types
+  - `detailed: true` returns per-result `status`, `diagnostic`, `matchedExpectations`, `error`
+  - `statusBreakdown` aggregate (verified/auth_failed/payload_filtered/...)
+  - `filters` echo of what was applied
+- **DOM XSS verification API**: `POST /api/poc/dom-xss` integrates Playwright headless
+  browser verifier for client-side XSS injection sinks. Returns per-target DOM HTML,
+  console logs, and JS errors.
+- **VuleDaemon 24h stability**: Unix socket IPC verified (`STATE`/`SCAN`/`STOP`),
+  file-watch trigger → scan-completed, baseline diff, persistent background process
+
+### Changed
+- **DVWA LFI payload adaptive path**: `low` level now uses absolute `/etc/passwd`
+  (was relative `../../../../etc/passwd` blocked by Apache config). Verified 90.5% on DVWA.
+- **PAYLOAD_DATABASE total**: 84 → 112 entries (bWAPP coverage restored from v1.7 regression)
+- `VuleSandboxBridge.generateReport(verifications?)` now accepts optional subset
+  for filtered reporting
+- `/api/poc/verify` total verified: 77/84 → **98/112 = 87.5%** (bWAPP coverage + more checks)
+
+### Fixed
+- **bWAPP payloads field mapping**: SQLi field name corrected per endpoint
+  (`title` vs `movie` vs `login`); error marker changed from `error` regex to
+  `contains: 'SQL'` (bWAPP hides error messages, only displays "SQL" keyword)
+- **bWAPP XSS Referer**: payload moved from URL parameter to `Referer` header
+  (HTTP_REFERER header injection)
+- **XSS iframei URL**: javascript: protocol URL-encoded to bypass shell escaping
+
+### Tests
+- 1089 → 1090 tests (+1, +0.09%) — added 4 PoC API request-shape tests
+- New: `tests/unit/integration/poc-api.test.ts` — types filter, detailed response,
+  Bridge verifyByType, generateReport(verifications?) filter
+- 0 TypeScript errors, 0 ESLint errors
+
+## [1.8.1] -2026-06-11
+
+### Fixed
+- **VuleSandboxBridge payload.matches deserialization**:
+  payload-database's string `/admin|First name/i` was passed verbatim to PocSandbox
+  which requires RegExp. Bridge now auto-converts string→RegExp with /pattern/flags
+  parsing, fallback to literal on parse error.
+- **`/api/poc/verify` targets filter**: `verifyAll()` now honors `this.sandboxes`
+  to only run payloads for the requested target(s) (was running all 84 every time).
+
+### Tests
+- 1088 → 1089 tests
+- 77/84 = 91.7% verified in Docker real environment (4 targets)
+
 ## [1.1.0] -2026-06-11
 
 ### Added
