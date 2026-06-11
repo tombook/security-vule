@@ -44,6 +44,8 @@ export interface PocExpectation {
   matches?: RegExp;
   statusCode?: number;
   containsUser?: string[];
+  timeDelayMs?: number;
+  baselineUrl?: string;
 }
 
 export type PocVerificationStatus =
@@ -57,7 +59,8 @@ export type PocVerificationStatus =
   | 'endpoint_changed'
   | 'timeout'
   | 'connection_error'
-  | 'unsupported_target';
+  | 'unsupported_target'
+  | 'time_based_verified';
 
 export interface PocResult {
   id: string;
@@ -236,7 +239,12 @@ export class PocSandbox {
 
     const start = Date.now();
     let lastError: string | undefined;
-    let lastResult: { statusCode?: number; body?: string; headers?: Record<string, string> } = {};
+    let lastResult: {
+      statusCode?: number;
+      body?: string;
+      headers?: Record<string, string>;
+      responseTimeMs?: number;
+    } = {};
     for (let attempt = 0; attempt <= this.retries; attempt++) {
       try {
         lastResult = await this.runWithRedirects(req);
@@ -254,7 +262,28 @@ export class PocSandbox {
             completedAt: Date.now(),
           };
         }
-        lastError = `attempt ${attempt + 1}: expectation not met`;
+
+        if (req.expected.timeDelayMs && req.expected.timeDelayMs > 0) {
+          const baseline = await this.measureBaseline(req);
+          const delayResult = await this.runWithRedirects(req);
+          const payloadMs = delayResult.responseTimeMs ?? Date.now() - start;
+          if (payloadMs - baseline >= req.expected.timeDelayMs * 0.7) {
+            return {
+              ...delayResult,
+              id: req.id,
+              success: true,
+              status: 'time_based_verified',
+              isolation: this.isolation,
+              matchedExpectations: ['timeDelayMs'],
+              retryable: false,
+              responseTimeMs: Date.now() - start,
+              completedAt: Date.now(),
+            };
+          }
+          lastError = `attempt ${attempt + 1}: time-based delay not detected (payload=${payloadMs}ms baseline=${baseline}ms expected=${req.expected.timeDelayMs}ms)`;
+        } else {
+          lastError = `attempt ${attempt + 1}: expectation not met`;
+        }
       } catch (e) {
         lastError = `attempt ${attempt + 1}: ${(e as Error).message}`;
       }
@@ -276,12 +305,47 @@ export class PocSandbox {
     };
   }
 
+  private async measureBaseline(req: PocRequest): Promise<number> {
+    const baselineUrl =
+      req.expected.baselineUrl ??
+      req.url
+        .replace(/['"+]/g, '')
+        .replace(/AND\s+SLEEP\(\d+\)/gi, '')
+        .replace(/AND\s+BENCHMARK\([^)]+\)/gi, '')
+        .replace(/--\s*-\s*$/, '');
+    const baselineReq: PocRequest = {
+      ...req,
+      id: `${req.id}-baseline`,
+      url: baselineUrl,
+      expected: {},
+      timeoutMs: Math.min(req.timeoutMs ?? 10000, 5000),
+    };
+    const baseStart = Date.now();
+    try {
+      await this.runWithRedirects(baselineReq);
+    } catch {
+      /* ignore */
+    }
+    return Date.now() - baseStart;
+  }
+
   private async runWithRedirects(
     req: PocRequest
-  ): Promise<{ statusCode?: number; body?: string; headers?: Record<string, string> }> {
+  ): Promise<{
+    statusCode?: number;
+    body?: string;
+    headers?: Record<string, string>;
+    responseTimeMs?: number;
+  }> {
     let fullUrl = req.url.startsWith('http') ? req.url : `${this.target.baseUrl}${req.url}`;
     let currentReq = req;
-    let result: { statusCode?: number; body?: string; headers?: Record<string, string> };
+    let result: {
+      statusCode?: number;
+      body?: string;
+      headers?: Record<string, string>;
+      responseTimeMs?: number;
+    };
+    const startMs = Date.now();
 
     for (let hop = 0; hop < 3; hop++) {
       result =
@@ -289,7 +353,9 @@ export class PocSandbox {
           ? await this.runInDocker(fullUrl, currentReq)
           : await this.runInProcess(fullUrl, currentReq);
 
-      if (result.statusCode !== 302) return result;
+      if (result.statusCode !== 302) {
+        return { ...result, responseTimeMs: Date.now() - startMs };
+      }
 
       const location = result.headers?.location;
       if (!location) return result;
@@ -309,7 +375,7 @@ export class PocSandbox {
       fullUrl = resolved;
     }
 
-    return result!;
+    return { ...result!, responseTimeMs: Date.now() - startMs };
   }
 
   private extractLocation(_body: string): string | null {

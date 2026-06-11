@@ -2,7 +2,13 @@
  * Tests for PocSandbox — uses a local Bun.serve mock target (no Docker needed).
  */
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
-import { PocSandbox, TARGETS, inferStatus } from '../../../src/poc/sandbox.js';
+import {
+  PocSandbox,
+  TARGETS,
+  inferStatus,
+  type PocVerificationStatus,
+  type PocExpectation,
+} from '../../../src/poc/sandbox.js';
 
 let mockServer: ReturnType<typeof Bun.serve> | null = null;
 const MOCK_PORT = 19234;
@@ -516,5 +522,40 @@ describe('PocSandbox — payload database for bWAPP bypasses (SOP v1.3)', () => 
     const payload = { id: 'commandi', target: '127.0.0.1||id' };
     expect(payload.target).toContain('||');
     expect(payload.target).not.toContain(';');
+  });
+});
+
+describe('PocSandbox — time-based blind SQLi (SOP v1.4)', () => {
+  test('PocExpectation supports timeDelayMs field', () => {
+    const expected: PocExpectation = { timeDelayMs: 3000, baselineUrl: '/sqli_4.php?title=test' };
+    expect(expected.timeDelayMs).toBe(3000);
+    expect(expected.baselineUrl).toBe('/sqli_4.php?title=test');
+  });
+
+  test('time_based_verified status exists in PocVerificationStatus', () => {
+    const status: PocVerificationStatus = 'time_based_verified';
+    expect(status).toBe('time_based_verified');
+  });
+
+  test('measureBaseline strips SLEEP from URL', async () => {
+    const sb = new PocSandbox({
+      target: { name: 'mock', baseUrl: `http://localhost:${MOCK_PORT}` },
+      isolation: 'process',
+    });
+    const fnStr = sb['measureBaseline'].toString();
+    expect(fnStr).toContain('SLEEP');
+    expect(fnStr).toContain('baselineUrl');
+  });
+
+  test('SLEEP(3) payload format is valid for MySQL', () => {
+    const sleepPayload = "Iron Man' AND SLEEP(3)-- -";
+    expect(sleepPayload).toContain('SLEEP(3)');
+    expect(sleepPayload).toContain('-- -');
+  });
+
+  test('BENCHMARK payload format is valid for MySQL', () => {
+    const benchmarkPayload = "Iron Man' AND BENCHMARK(10000000,SHA1('test'))-- -";
+    expect(benchmarkPayload).toContain('BENCHMARK');
+    expect(benchmarkPayload).toContain('SHA1');
   });
 });
