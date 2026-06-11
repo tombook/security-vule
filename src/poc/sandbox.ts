@@ -164,7 +164,7 @@ export const TARGETS: Record<PocTarget['name'], PocTarget> = {
   bwapp: {
     name: 'bwapp',
     baseUrl: 'http://localhost:8081',
-    credentials: { user: 'bee', password: 'bug', loginPath: '/portal.php' },
+    credentials: { user: 'bee', password: 'bug', loginPath: '/login.php' },
   },
   sqlilabs: {
     name: 'sqlilabs',
@@ -192,27 +192,41 @@ export class PocSandbox {
   private readonly retries: number;
   private cookies: Record<string, string> = {};
   private loggedIn = false;
+  private readonly cookieJarPath: string;
 
   constructor(options: PocSandboxOptions) {
     this.target = typeof options.target === 'string' ? TARGETS[options.target] : options.target;
     this.isolation = options.isolation ?? 'process';
     this.dockerImage = options.dockerImage ?? 'alpine/curl:8.10.1';
     this.retries = options.retries ?? 2;
+    this.cookieJarPath = `/tmp/vule-poc-${this.target.name}-${Date.now()}.cookie`;
   }
 
-  async login(): Promise<void> {
+  async login(securityLevel?: 'low' | 'medium' | 'high'): Promise<void> {
     if (!this.target.credentials || this.loggedIn) return;
     const { user, password, loginPath } = this.target.credentials;
-    const body = `username=${encodeURIComponent(user)}&password=${encodeURIComponent(password)}`;
-    await this.execute({
+    const isBwapp = this.target.name === 'bwapp';
+    const userField = isBwapp ? 'login' : 'username';
+    const level =
+      securityLevel === 'low'
+        ? 0
+        : securityLevel === 'medium'
+          ? 1
+          : securityLevel === 'high'
+            ? 2
+            : 0;
+    const body = `${userField}=${encodeURIComponent(user)}&password=${encodeURIComponent(password)}${isBwapp ? `&form=submit&security_level=${level}` : '&Login=Login'}`;
+    const result = await this.execute({
       id: 'login',
       method: 'POST',
       url: loginPath,
       body,
-      expected: { statusCode: 200 },
+      expected: {},
       timeoutMs: 5000,
     });
-    this.loggedIn = true;
+    if (result.statusCode === 200 || result.statusCode === 302 || result.success) {
+      this.loggedIn = true;
+    }
   }
 
   async execute(req: PocRequest): Promise<PocResult> {
@@ -294,8 +308,14 @@ export class PocSandbox {
   ): Promise<{ statusCode?: number; body?: string }> {
     return new Promise((resolve, reject) => {
       const args = ['-sS', '-w', '\\n%{http_code}', '-X', req.method];
+      if (this.cookieJarPath && req.id !== 'login') {
+        args.push('-b', this.cookieJarPath);
+      }
       for (const [k, v] of Object.entries(req.headers ?? {})) args.push('-H', `${k}: ${v}`);
       if (req.body) args.push('-d', req.body);
+      if (this.cookieJarPath && req.id === 'login') {
+        args.push('-c', this.cookieJarPath);
+      }
       for (const [k, v] of Object.entries(this.cookies)) args.push('-b', `${k}=${v}`);
       args.push(url);
 

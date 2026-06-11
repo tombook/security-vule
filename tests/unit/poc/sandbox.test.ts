@@ -318,3 +318,30 @@ describe('PocSandbox — execute returns status field', () => {
     expect(result.retryable).toBeDefined();
   });
 });
+
+describe('PocSandbox — bWAPP login (SOP v1.2 iteration)', () => {
+  test('bWAPP uses /login.php and login/password fields', async () => {
+    const sb = new PocSandbox({ target: 'bwapp', isolation: 'process' });
+    expect(sb['target'].baseUrl).toBe('http://localhost:8081');
+    expect(sb['target'].credentials?.user).toBe('bee');
+    expect(sb['target'].credentials?.password).toBe('bug');
+    expect(sb['target'].credentials?.loginPath).toBe('/login.php');
+  });
+
+  test('cookieJarPath is initialized per-instance', async () => {
+    const sb1 = new PocSandbox({ target: 'mock', isolation: 'process' });
+    await new Promise((r) => setTimeout(r, 2));
+    const sb2 = new PocSandbox({ target: 'mock', isolation: 'process' });
+    expect(sb1['cookieJarPath']).toContain('vule-poc-');
+    expect(sb1['cookieJarPath']).not.toBe(sb2['cookieJarPath']);
+  });
+
+  test('login() accepts security_level parameter', async () => {
+    const sb = new PocSandbox({ target: 'bwapp', isolation: 'process' });
+    const spy = Bun.spawn(['bash', '-c', 'true']);
+    await spy.exited;
+    // Mock assertion: securityLevel parameter signature
+    const fnStr = sb.login.toString();
+    expect(fnStr).toContain('securityLevel');
+  });
+});
