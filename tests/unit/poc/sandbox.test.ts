@@ -559,3 +559,281 @@ describe('PocSandbox — time-based blind SQLi (SOP v1.4)', () => {
     expect(benchmarkPayload).toContain('SHA1');
   });
 });
+
+describe('PocSandbox — noFollowRedirect (SOP v1.6)', () => {
+  const REDIR_PORT = MOCK_PORT + 10;
+  let redirServer: ReturnType<typeof Bun.serve> | null = null;
+
+  beforeAll(() => {
+    redirServer = Bun.serve({
+      port: REDIR_PORT,
+      fetch(req) {
+        const url = new URL(req.url);
+        if (url.pathname === '/redirector') {
+          return new Response('redirecting', {
+            status: 302,
+            headers: { Location: '/final-dest' },
+          });
+        }
+        if (url.pathname === '/final-dest') {
+          return new Response('Final destination reached');
+        }
+        return new Response('OK', { status: 200 });
+      },
+    });
+  });
+
+  afterAll(() => {
+    redirServer?.stop();
+  });
+
+  test('noFollowRedirect: true stops at 302 without following', async () => {
+    const sb = new PocSandbox({
+      target: { name: 'mock', baseUrl: `http://localhost:${REDIR_PORT}` },
+      isolation: 'process',
+      retries: 0,
+    });
+    const r = await sb.execute({
+      id: 'test-nofollow',
+      method: 'GET',
+      url: '/redirector',
+      noFollowRedirect: true,
+      expected: { statusCode: 302 },
+      timeoutMs: 5000,
+    });
+    expect(r.success).toBe(true);
+    expect(r.status).toBe('verified');
+    expect(r.matchedExpectations).toContain('statusCode');
+  });
+
+  test('without noFollowRedirect: follows 302 to destination', async () => {
+    const sb = new PocSandbox({
+      target: { name: 'mock', baseUrl: `http://localhost:${REDIR_PORT}` },
+      isolation: 'process',
+      retries: 0,
+    });
+    const r = await sb.execute({
+      id: 'test-follow',
+      method: 'GET',
+      url: '/redirector',
+      expected: { contains: 'Final destination reached' },
+      timeoutMs: 5000,
+    });
+    expect(r.success).toBe(true);
+    expect(r.body).toContain('Final destination reached');
+  });
+});
+
+describe('PocSandbox — headerContains / headerMatches (SOP v1.6)', () => {
+  const HDR_PORT = MOCK_PORT + 11;
+  let hdrServer: ReturnType<typeof Bun.serve> | null = null;
+
+  beforeAll(() => {
+    hdrServer = Bun.serve({
+      port: HDR_PORT,
+      fetch(req) {
+        const url = new URL(req.url);
+        if (url.pathname === '/custom-headers') {
+          return new Response('hello', {
+            status: 200,
+            headers: {
+              'X-Custom-Security': 'enabled',
+              'X-XSS-Protection': '0',
+              Server: 'Apache/2.4.25',
+            },
+          });
+        }
+        if (url.pathname === '/check-cookies') {
+          const cookie = req.headers.get('cookie') || '';
+          return new Response(`cookies: ${cookie}`, { status: 200 });
+        }
+        return new Response('OK', { status: 200 });
+      },
+    });
+  });
+
+  afterAll(() => {
+    hdrServer?.stop();
+  });
+
+  test('headerContains matches case-insensitively', async () => {
+    const sb = new PocSandbox({
+      target: { name: 'mock', baseUrl: `http://localhost:${HDR_PORT}` },
+      isolation: 'process',
+      retries: 0,
+    });
+    const r = await sb.execute({
+      id: 'test-hdr-contains',
+      method: 'GET',
+      url: '/custom-headers',
+      expected: { headerContains: 'X-XSS-Protection: 0' },
+      timeoutMs: 5000,
+    });
+    expect(r.success).toBe(true);
+    expect(r.matchedExpectations).toContain('headerContains');
+  });
+
+  test('headerMatches with regex detects server header', async () => {
+    const sb = new PocSandbox({
+      target: { name: 'mock', baseUrl: `http://localhost:${HDR_PORT}` },
+      isolation: 'process',
+      retries: 0,
+    });
+    const r = await sb.execute({
+      id: 'test-hdr-matches',
+      method: 'GET',
+      url: '/custom-headers',
+      expected: { headerMatches: /server:\s*apache/i },
+      timeoutMs: 5000,
+    });
+    expect(r.success).toBe(true);
+    expect(r.matchedExpectations).toContain('headerMatches');
+  });
+
+  test('headerContains fails when header absent', async () => {
+    const sb = new PocSandbox({
+      target: { name: 'mock', baseUrl: `http://localhost:${HDR_PORT}` },
+      isolation: 'process',
+      retries: 0,
+    });
+    const r = await sb.execute({
+      id: 'test-hdr-missing',
+      method: 'GET',
+      url: '/custom-headers',
+      expected: { headerContains: 'Content-Security-Policy' },
+      timeoutMs: 5000,
+    });
+    expect(r.success).toBe(false);
+  });
+});
+
+describe('PocSandbox — cookies field (SOP v1.6)', () => {
+  const COOKIE_PORT = MOCK_PORT + 12;
+  let cookieServer: ReturnType<typeof Bun.serve> | null = null;
+
+  beforeAll(() => {
+    cookieServer = Bun.serve({
+      port: COOKIE_PORT,
+      fetch(req) {
+        const url = new URL(req.url);
+        if (url.pathname === '/check-cookies') {
+          const cookie = req.headers.get('cookie') || '';
+          if (cookie.includes('session=abc123') && cookie.includes('role=admin')) {
+            return new Response('Authenticated as admin', { status: 200 });
+          }
+          return new Response('Not authenticated', { status: 403 });
+        }
+        return new Response('OK', { status: 200 });
+      },
+    });
+  });
+
+  afterAll(() => {
+    cookieServer?.stop();
+  });
+
+  test('cookies field injects custom cookies into request', async () => {
+    const sb = new PocSandbox({
+      target: { name: 'mock', baseUrl: `http://localhost:${COOKIE_PORT}` },
+      isolation: 'process',
+      retries: 0,
+    });
+    const r = await sb.execute({
+      id: 'test-cookies',
+      method: 'GET',
+      url: '/check-cookies',
+      cookies: { session: 'abc123', role: 'admin' },
+      expected: { contains: 'Authenticated as admin' },
+      timeoutMs: 5000,
+    });
+    expect(r.success).toBe(true);
+  });
+});
+
+describe('PocSandbox — relative redirect resolution (SOP v1.5)', () => {
+  const REL_PORT = MOCK_PORT + 13;
+  let relServer: ReturnType<typeof Bun.serve> | null = null;
+
+  beforeAll(() => {
+    relServer = Bun.serve({
+      port: REL_PORT,
+      fetch(req) {
+        const url = new URL(req.url);
+        if (url.pathname === '/api/login') {
+          return new Response('logged in', {
+            status: 302,
+            headers: { Location: 'dashboard' },
+          });
+        }
+        if (url.pathname === '/api/dashboard') {
+          return new Response('Dashboard content loaded');
+        }
+        return new Response('OK', { status: 200 });
+      },
+    });
+  });
+
+  afterAll(() => {
+    relServer?.stop();
+  });
+
+  test('relative Location: "dashboard" resolves to /api/dashboard', async () => {
+    const sb = new PocSandbox({
+      target: { name: 'mock', baseUrl: `http://localhost:${REL_PORT}` },
+      isolation: 'process',
+      retries: 0,
+    });
+    const r = await sb.execute({
+      id: 'test-rel-redirect',
+      method: 'GET',
+      url: '/api/login',
+      expected: { contains: 'Dashboard content loaded' },
+      timeoutMs: 5000,
+    });
+    expect(r.success).toBe(true);
+    expect(r.body).toContain('Dashboard content loaded');
+  });
+});
+
+describe('PocSandbox — POST method via execute (SOP v1.5)', () => {
+  const POST_PORT = MOCK_PORT + 14;
+  let postServer: ReturnType<typeof Bun.serve> | null = null;
+
+  beforeAll(() => {
+    postServer = Bun.serve({
+      port: POST_PORT,
+      async fetch(req) {
+        const url = new URL(req.url);
+        if (url.pathname === '/submit' && req.method === 'POST') {
+          const body = await req.text();
+          if (body.includes('user=admin') && body.includes('pass=secret')) {
+            return new Response('Login successful');
+          }
+          return new Response('Login failed', { status: 401 });
+        }
+        return new Response('OK', { status: 200 });
+      },
+    });
+  });
+
+  afterAll(() => {
+    postServer?.stop();
+  });
+
+  test('POST with body content is sent correctly', async () => {
+    const sb = new PocSandbox({
+      target: { name: 'mock', baseUrl: `http://localhost:${POST_PORT}` },
+      isolation: 'process',
+      retries: 0,
+    });
+    const r = await sb.execute({
+      id: 'test-post',
+      method: 'POST',
+      url: '/submit',
+      body: 'user=admin&pass=secret',
+      expected: { contains: 'Login successful' },
+      timeoutMs: 5000,
+    });
+    expect(r.success).toBe(true);
+  });
+});
