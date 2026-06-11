@@ -36,6 +36,7 @@ export interface PocRequest {
   body?: string;
   headers?: Record<string, string>;
   cookies?: Record<string, string>;
+  noFollowRedirect?: boolean;
   expected: PocExpectation;
   timeoutMs?: number;
 }
@@ -354,7 +355,7 @@ export class PocSandbox {
           ? await this.runInDocker(fullUrl, currentReq)
           : await this.runInProcess(fullUrl, currentReq);
 
-      if (result.statusCode !== 302) {
+      if (result.statusCode !== 302 || req.noFollowRedirect) {
         return { ...result, responseTimeMs: Date.now() - startMs };
       }
 
@@ -405,13 +406,17 @@ export class PocSandbox {
       const headerStr = Object.entries(result.headers ?? {})
         .map(([k, v]) => `${k}: ${v}`)
         .join('\n');
-      if (!headerStr.includes(expected.headerContains)) return false;
+      if (!headerStr.toLowerCase().includes(expected.headerContains.toLowerCase())) return false;
     }
     if (expected.headerMatches) {
       const headerStr = Object.entries(result.headers ?? {})
         .map(([k, v]) => `${k}: ${v}`)
         .join('\n');
-      if (!expected.headerMatches.test(headerStr)) return false;
+      if (
+        !expected.headerMatches.test(headerStr) &&
+        !expected.headerMatches.test(headerStr.toLowerCase())
+      )
+        return false;
     }
     return true;
   }
@@ -437,13 +442,18 @@ export class PocSandbox {
       const headerStr = Object.entries(result.headers ?? {})
         .map(([k, v]) => `${k}: ${v}`)
         .join('\n');
-      if (headerStr.includes(expected.headerContains)) keys.push('headerContains');
+      if (headerStr.toLowerCase().includes(expected.headerContains.toLowerCase()))
+        keys.push('headerContains');
     }
     if (expected.headerMatches) {
       const headerStr = Object.entries(result.headers ?? {})
         .map(([k, v]) => `${k}: ${v}`)
         .join('\n');
-      if (expected.headerMatches.test(headerStr)) keys.push('headerMatches');
+      if (
+        expected.headerMatches.test(headerStr) ||
+        expected.headerMatches.test(headerStr.toLowerCase())
+      )
+        keys.push('headerMatches');
     }
     return keys;
   }
