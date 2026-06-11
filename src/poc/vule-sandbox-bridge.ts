@@ -122,6 +122,19 @@ export class VuleSandboxBridge {
       };
     }
 
+    const expected = payload.expected as PocExpectation & {
+      matches?: RegExp | string;
+    };
+    if (typeof expected.matches === 'string') {
+      const m = expected.matches.trim();
+      const match = m.match(/^\/(.+)\/([gimsuy]*)$/);
+      try {
+        expected.matches = match ? new RegExp(match[1], match[2]) : new RegExp(m);
+      } catch {
+        expected.matches = new RegExp(m.replace(/^\/|\/[gimsuy]*$/g, ''));
+      }
+    }
+
     const req = {
       id: payload.id,
       method: payload.method,
@@ -130,7 +143,7 @@ export class VuleSandboxBridge {
       headers: payload.headers,
       cookies: payload.cookies,
       noFollowRedirect: payload.noFollowRedirect,
-      expected: payload.expected as PocExpectation,
+      expected,
       timeoutMs: 10000,
     };
 
@@ -178,7 +191,9 @@ export class VuleSandboxBridge {
 
   async verifyAll(): Promise<VulnerabilityVerification[]> {
     const results: VulnerabilityVerification[] = [];
+    const targets = Array.from(this.sandboxes.keys());
     for (const p of PAYLOAD_DATABASE) {
+      if (targets.length > 0 && !targets.includes(p.target)) continue;
       results.push(await this.verifyPayload(p));
     }
     return results;
