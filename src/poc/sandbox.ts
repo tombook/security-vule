@@ -234,24 +234,22 @@ export class PocSandbox {
       await this.login();
     }
 
-    const fullUrl = req.url.startsWith('http') ? req.url : `${this.target.baseUrl}${req.url}`;
-
     const start = Date.now();
     let lastError: string | undefined;
+    let lastResult: { statusCode?: number; body?: string; headers?: Record<string, string> } = {};
     for (let attempt = 0; attempt <= this.retries; attempt++) {
       try {
-        const result =
-          this.isolation === 'docker'
-            ? await this.runInDocker(fullUrl, req)
-            : await this.runInProcess(fullUrl, req);
+        lastResult = await this.runWithRedirects(req);
 
-        if (this.matches(result, req.expected)) {
+        if (this.matches(lastResult, req.expected)) {
           return {
-            ...result,
+            ...lastResult,
             id: req.id,
             success: true,
             status: 'verified',
             isolation: this.isolation,
+            matchedExpectations: this.matchedKeys(lastResult, req.expected),
+            retryable: false,
             responseTimeMs: Date.now() - start,
             completedAt: Date.now(),
           };
@@ -262,15 +260,6 @@ export class PocSandbox {
       }
     }
 
-    let lastResult: { statusCode?: number; body?: string } = {};
-    try {
-      lastResult =
-        this.isolation === 'docker'
-          ? await this.runInDocker(fullUrl, req)
-          : await this.runInProcess(fullUrl, req);
-    } catch {
-      /* ignore */
-    }
     const inferred = inferStatus({ success: false, ...lastResult, matchedExpectations: [] });
 
     return {
@@ -285,6 +274,46 @@ export class PocSandbox {
       retryable: inferred.retryable,
       completedAt: Date.now(),
     };
+  }
+
+  private async runWithRedirects(
+    req: PocRequest
+  ): Promise<{ statusCode?: number; body?: string; headers?: Record<string, string> }> {
+    let fullUrl = req.url.startsWith('http') ? req.url : `${this.target.baseUrl}${req.url}`;
+    let currentReq = req;
+    let result: { statusCode?: number; body?: string; headers?: Record<string, string> };
+
+    for (let hop = 0; hop < 3; hop++) {
+      result =
+        this.isolation === 'docker'
+          ? await this.runInDocker(fullUrl, currentReq)
+          : await this.runInProcess(fullUrl, currentReq);
+
+      if (result.statusCode !== 302) return result;
+
+      const location = result.headers?.location;
+      if (!location) return result;
+
+      const resolved = location.startsWith('http')
+        ? location
+        : `${this.target.baseUrl}${location.startsWith('/') ? '' : '/'}${location}`;
+
+      currentReq = {
+        ...currentReq,
+        id: `${currentReq.id}-redirect-${hop + 1}`,
+        url: resolved,
+        method: 'GET',
+        body: undefined,
+        headers: undefined,
+      };
+      fullUrl = resolved;
+    }
+
+    return result!;
+  }
+
+  private extractLocation(_body: string): string | null {
+    return null;
   }
 
   private matches(
@@ -302,12 +331,33 @@ export class PocSandbox {
     return true;
   }
 
+  private matchedKeys(
+    result: { statusCode?: number; body?: string },
+    expected: PocExpectation
+  ): string[] {
+    const keys: string[] = [];
+    if (expected.statusCode !== undefined && result.statusCode === expected.statusCode) {
+      keys.push('statusCode');
+    }
+    if (expected.contains && result.body?.includes(expected.contains)) keys.push('contains');
+    if (expected.matches && expected.matches.test(result.body ?? '')) keys.push('matches');
+    if (
+      expected.containsUser &&
+      result.body &&
+      expected.containsUser.every((u) => result.body!.toLowerCase().includes(u.toLowerCase()))
+    ) {
+      keys.push('containsUser');
+    }
+    return keys;
+  }
+
   private runInProcess(
     url: string,
     req: PocRequest
-  ): Promise<{ statusCode?: number; body?: string }> {
+  ): Promise<{ statusCode?: number; body?: string; headers?: Record<string, string> }> {
     return new Promise((resolve, reject) => {
-      const args = ['-sS', '-w', '\\n%{http_code}', '-X', req.method];
+      const headerFile = `/tmp/vule-poc-headers-${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.tmp`;
+      const args = ['-sS', '-D', headerFile, '-w', '\\n%{http_code}', '-X', req.method];
       if (this.cookieJarPath && req.id !== 'login') {
         args.push('-b', this.cookieJarPath);
       }
@@ -322,13 +372,31 @@ export class PocSandbox {
       const proc = spawn('curl', args, { timeout: req.timeoutMs ?? 10000 });
       const chunks: Buffer[] = [];
       proc.stdout.on('data', (c: Buffer) => chunks.push(c));
-      proc.on('close', (code) => {
+      proc.on('close', async (code) => {
         if (code !== 0 && code !== null) return reject(new Error(`curl exit ${code}`));
         const out = Buffer.concat(chunks).toString();
         const lastNewline = out.lastIndexOf('\n');
         const body = lastNewline >= 0 ? out.slice(0, lastNewline) : out;
         const statusLine = lastNewline >= 0 ? out.slice(lastNewline + 1).trim() : '';
-        resolve({ statusCode: parseInt(statusLine, 10) || undefined, body });
+        const statusCode = parseInt(statusLine, 10) || undefined;
+
+        const headers: Record<string, string> = {};
+        try {
+          const { readFileSync } = await import('fs');
+          const hdrFile = readFileSync(headerFile, 'utf-8');
+          for (const line of hdrFile.split(/\r?\n/)) {
+            const m = line.match(/^([A-Za-z0-9-]+):\s*(.+?)\s*$/);
+            if (m) headers[m[1].toLowerCase()] = m[2].trim();
+          }
+          const { unlinkSync } = await import('fs');
+          try {
+            unlinkSync(headerFile);
+          } catch {}
+        } catch {
+          /* ignore */
+        }
+
+        resolve({ statusCode, body, headers });
       });
       proc.on('error', reject);
     });
@@ -337,7 +405,12 @@ export class PocSandbox {
   private runInDocker(
     url: string,
     req: PocRequest
-  ): Promise<{ statusCode?: number; body?: string; containerId?: string }> {
+  ): Promise<{
+    statusCode?: number;
+    body?: string;
+    headers?: Record<string, string>;
+    containerId?: string;
+  }> {
     return new Promise((resolve, reject) => {
       const dockerArgs = [
         'run',
@@ -347,7 +420,7 @@ export class PocSandbox {
         this.dockerImage,
         'sh',
         '-c',
-        `curl -sS -w '\\n%{http_code}' -X ${req.method} '${url}' ${req.body ? `-d '${req.body.replace(/'/g, "'\\''")}'` : ''}`,
+        `curl -sS -D - -w '\\n%{http_code}' -X ${req.method} '${url}' ${req.body ? `-d '${req.body.replace(/'/g, "'\\''")}'` : ''}`,
       ];
       const proc = spawn('docker', dockerArgs, { timeout: req.timeoutMs ?? 15000 });
       const chunks: Buffer[] = [];
@@ -356,10 +429,25 @@ export class PocSandbox {
       proc.on('close', (code) => {
         if (code !== 0 && code !== null) return reject(new Error(`docker exit ${code}`));
         const out = Buffer.concat(chunks).toString();
-        const lastNewline = out.lastIndexOf('\n');
-        const body = lastNewline >= 0 ? out.slice(0, lastNewline) : out;
-        const statusLine = lastNewline >= 0 ? out.slice(lastNewline + 1).trim() : '';
-        resolve({ statusCode: parseInt(statusLine, 10) || undefined, body, containerId });
+        // Docker output: HTTP/1.1 <code>\nHeaders...\n\nBody\n<status>
+        const statusLineMatch = out.match(/\n(\d{3})\s*$/);
+        const statusCode = statusLineMatch ? parseInt(statusLineMatch[1], 10) : undefined;
+        const headerEnd = out.indexOf('\r\n\r\n');
+        const headers: Record<string, string> = {};
+        if (headerEnd > 0) {
+          const headerSection = out.slice(0, headerEnd);
+          for (const line of headerSection.split('\r\n')) {
+            const m = line.match(/^([A-Za-z0-9-]+):\s*(.+)$/);
+            if (m) headers[m[1].toLowerCase()] = m[2].trim();
+          }
+        }
+        // Strip headers and final status line
+        const bodyStart = headerEnd > 0 ? headerEnd + 4 : 0;
+        const body = out
+          .slice(bodyStart)
+          .replace(/\n\d{3}\s*$/, '')
+          .trim();
+        resolve({ statusCode, body, headers, containerId });
       });
       proc.on('error', reject);
     });

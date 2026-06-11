@@ -2,7 +2,7 @@
  * Tests for PocSandbox — uses a local Bun.serve mock target (no Docker needed).
  */
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
-import { PocSandbox, TARGETS } from '../../../src/poc/sandbox.js';
+import { PocSandbox, TARGETS, inferStatus } from '../../../src/poc/sandbox.js';
 
 let mockServer: ReturnType<typeof Bun.serve> | null = null;
 const MOCK_PORT = 19234;
@@ -343,5 +343,178 @@ describe('PocSandbox — bWAPP login (SOP v1.2 iteration)', () => {
     // Mock assertion: securityLevel parameter signature
     const fnStr = sb.login.toString();
     expect(fnStr).toContain('securityLevel');
+  });
+});
+
+describe('PocSandbox — redirect handling (SOP v1.3)', () => {
+  test('302 redirect is followed to /redirected path', async () => {
+    let redirectedServer: ReturnType<typeof Bun.serve> | null = null;
+    const REDIR_PORT = 19235;
+    redirectedServer = Bun.serve({
+      port: REDIR_PORT,
+      async fetch(req) {
+        const url = new URL(req.url);
+        if (url.pathname === '/redir') {
+          return new Response(null, {
+            status: 302,
+            headers: { Location: '/final' },
+          });
+        }
+        if (url.pathname === '/final') {
+          return new Response('SECRET_FINAL_DATA', { status: 200 });
+        }
+        return new Response('OK', { status: 200 });
+      },
+    });
+
+    try {
+      const sb = new PocSandbox({
+        target: { name: 'mock', baseUrl: `http://localhost:${REDIR_PORT}` },
+        isolation: 'process',
+      });
+      const result = await sb.execute({
+        id: 'redir-1',
+        method: 'GET',
+        url: '/redir',
+        expected: { contains: 'SECRET_FINAL_DATA' },
+        timeoutMs: 3000,
+      });
+      expect(result.statusCode).toBe(200);
+      expect(result.success).toBe(true);
+    } finally {
+      redirectedServer?.stop();
+    }
+  });
+
+  test('3+ redirects are followed (up to hop limit)', async () => {
+    let chainServer: ReturnType<typeof Bun.serve> | null = null;
+    const CHAIN_PORT = 19236;
+    let hopCount = 0;
+    chainServer = Bun.serve({
+      port: CHAIN_PORT,
+      async fetch(req) {
+        const url = new URL(req.url);
+        hopCount++;
+        if (url.pathname === '/hop1') {
+          return new Response(null, { status: 302, headers: { Location: '/hop2' } });
+        }
+        if (url.pathname === '/hop2') {
+          return new Response(null, { status: 302, headers: { Location: '/hop3' } });
+        }
+        if (url.pathname === '/hop3') {
+          return new Response('REDIRECTED_3HOPS', { status: 200 });
+        }
+        return new Response('OK', { status: 200 });
+      },
+    });
+
+    try {
+      const sb = new PocSandbox({
+        target: { name: 'mock', baseUrl: `http://localhost:${CHAIN_PORT}` },
+        isolation: 'process',
+      });
+      const result = await sb.execute({
+        id: 'redir-chain',
+        method: 'GET',
+        url: '/hop1',
+        expected: { contains: 'REDIRECTED_3HOPS' },
+        timeoutMs: 3000,
+      });
+      expect(result.success).toBe(true);
+      expect(result.body).toContain('REDIRECTED_3HOPS');
+    } finally {
+      chainServer?.stop();
+    }
+  });
+
+  test('non-2xx non-302: returns the actual response', async () => {
+    const sb = new PocSandbox({
+      target: { name: 'mock', baseUrl: `http://localhost:${MOCK_PORT}` },
+      isolation: 'process',
+    });
+    const result = await sb.execute({
+      id: '404-1',
+      method: 'GET',
+      url: '/404',
+      expected: { statusCode: 404 },
+      timeoutMs: 2000,
+    });
+    expect(result.statusCode).toBe(404);
+    expect(result.success).toBe(true);
+  });
+});
+
+describe('PocSandbox — inferStatus for SOP v1.3 unbreakable cases', () => {
+  test('payload_filtered: SQL error in body', () => {
+    const result = inferStatus({
+      success: false,
+      body: "You have an error in your SQL syntax near 'xxx'",
+      statusCode: 200,
+      matchedExpectations: [],
+    });
+    expect(result.status).toBe('payload_filtered');
+    expect(result.retryable).toBe(false);
+  });
+
+  test('table_empty: no rows found', () => {
+    const result = inferStatus({
+      success: false,
+      body: 'No results found in database',
+      statusCode: 200,
+      matchedExpectations: [],
+    });
+    expect(result.status).toBe('table_empty');
+    expect(result.retryable).toBe(false);
+  });
+
+  test('auth_failed: 302 redirect on protected endpoint', () => {
+    const result = inferStatus({
+      success: false,
+      body: '',
+      statusCode: 302,
+      matchedExpectations: [],
+    });
+    expect(result.status).toBe('auth_failed');
+    expect(result.retryable).toBe(true);
+  });
+
+  test('connection_error: 0 statusCode (network failure)', () => {
+    const result = inferStatus({
+      success: false,
+      body: undefined,
+      statusCode: 0,
+      matchedExpectations: [],
+    });
+    expect(result.status).toBe('connection_error');
+    expect(result.retryable).toBe(true);
+  });
+});
+
+describe('PocSandbox — payload database for bWAPP bypasses (SOP v1.3)', () => {
+  test('LIKE wildcard % payload is valid for sqli_1 type', () => {
+    const payload = { id: 'sqli_1-like', url: '/sqli_1.php?title=%25&action=search' };
+    expect(payload.url).toContain('%25');
+  });
+
+  test('numeric OR payload is valid for sqli_2 type', () => {
+    const payload = { id: 'sqli_2-num', url: '/sqli_2.php?movie=1+OR+1%3D1&action=go' };
+    expect(payload.url).toContain('1+OR+1%3D1');
+  });
+
+  test('GBK encoding %bf%27 payload for sqli_2 high bypass', () => {
+    const payload = { id: 'sqli_2-gbk', url: '/sqli_2.php?movie=1%bf%27+OR+1%3D1+--+-' };
+    expect(payload.url).toContain('%bf%27');
+  });
+
+  test('attribute XSS payload works without <script>', () => {
+    const payload = { tag: '<img src=x onerror=alert(1)>' };
+    expect(payload.tag).toContain('onerror=');
+    expect(payload.tag).not.toContain('<script>');
+  });
+
+  test('|| shell pipe bypass works for command injection', () => {
+    const payload = { id: 'commandi', target: '127.0.0.1||id' };
+    expect(payload.target).toContain('||');
+    expect(payload.target).not.toContain(';');
   });
 });
