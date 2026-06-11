@@ -3,12 +3,23 @@ import { DIMENSIONS, normalizeWeights } from '../../../../src/engine/dimensions/
 
 describe('Sprint 8 dimensions integration', () => {
   test('all 10 new dimensions registered', () => {
-    for (const n of ['chaos', 'phaseTransition', 'fieldTheory', 'fractal', 'nonEquilibrium', 'gameTheory', 'transfer', 'differentialGeometry', 'renormalization', 'categoryBasic']) {
+    for (const n of [
+      'chaos',
+      'phaseTransition',
+      'fieldTheory',
+      'fractal',
+      'nonEquilibrium',
+      'gameTheory',
+      'transfer',
+      'differentialGeometry',
+      'renormalization',
+      'categoryBasic',
+    ]) {
       expect(DIMENSIONS[n]).toBeDefined();
     }
   });
-  test('total dimensions = 29 (19 P0-P2 + 6 frameworks + 4 P3... wait 19+10=29)', () => {
-    expect(Object.keys(DIMENSIONS).length).toBe(29);
+  test('total dimensions = 30 (19 P0-P2 + 6 frameworks + 4 P3... wait 19+10=29)', () => {
+    expect(Object.keys(DIMENSIONS).length).toBe(30);
   });
   test('total weights normalize to 1.0', () => {
     const raw: Record<string, number> = {};

@@ -37,6 +37,7 @@ import { TransferDimension } from './transfer.js';
 import { DifferentialGeometryDimension } from './differential-geometry.js';
 import { RenormalizationDimension } from './renormalization.js';
 import { CategoryBasicDimension } from './category-basic.js';
+import { FileUploadDimension } from './file-upload.js';
 
 class AstPlaceholderDim extends BaseDimension {
   readonly name = 'ast';
@@ -76,6 +77,7 @@ export const DIMENSIONS: Record<string, DimensionModule> = {
   differentialGeometry: new DifferentialGeometryDimension(),
   renormalization: new RenormalizationDimension(),
   categoryBasic: new CategoryBasicDimension(),
+  fileUpload: new FileUploadDimension(),
 };
 
 export function registerDimension(dim: DimensionModule): void {
@@ -83,7 +85,7 @@ export function registerDimension(dim: DimensionModule): void {
 }
 
 export function getEnabledDimensions(flags: Record<string, boolean>): DimensionModule[] {
-  return Object.values(DIMENSIONS).filter(d => flags[d.name] !== false);
+  return Object.values(DIMENSIONS).filter((d) => flags[d.name] !== false);
 }
 
 export function normalizeWeights(weights: Record<string, number>): Record<string, number> {

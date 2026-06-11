@@ -608,6 +608,12 @@ export function renderReportViewer(job: {
         'Use password_hash() for passwords, hash("sha256", ...) for integrity, random_bytes() for tokens.',
       example: '$hash = password_hash($password, PASSWORD_ARGON2ID);',
     },
+    'Insecure File Upload': {
+      description:
+        'Whitelist allowed extensions (jpg/png/pdf only). chmod755 on upload dir. Verify MIME via finfo_file(). Block script execution in upload directory (Apache/nginx config).',
+      example:
+        '$allowed = ["jpg", "png", "pdf"];\n$ext = strtolower(pathinfo($_FILES["file"]["name"], PATHINFO_EXTENSION));\nif (!in_array($ext, $allowed, true)) die("Blocked");\nif (move_uploaded_file($_FILES["file"]["tmp_name"], "/var/www/uploads/" . basename($_FILES["file"]["name"]))) {\n echo "OK";\n}',
+    },
   };
 
   return (

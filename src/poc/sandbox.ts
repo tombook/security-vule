@@ -46,9 +46,23 @@ export interface PocExpectation {
   containsUser?: string[];
 }
 
+export type PocVerificationStatus =
+  | 'verified'
+  | 'rejected'
+  | 'table_empty'
+  | 'no_data_returned'
+  | 'auth_failed'
+  | 'rate_limited'
+  | 'payload_filtered'
+  | 'endpoint_changed'
+  | 'timeout'
+  | 'connection_error'
+  | 'unsupported_target';
+
 export interface PocResult {
   id: string;
   success: boolean;
+  status: PocVerificationStatus;
   statusCode?: number;
   responseTimeMs: number;
   body?: string;
@@ -56,7 +70,89 @@ export interface PocResult {
   isolation: PocIsolation;
   containerId?: string;
   error?: string;
+  diagnostic?: string;
+  retryable: boolean;
   completedAt: number;
+}
+
+export function inferStatus(result: {
+  success: boolean;
+  body?: string;
+  statusCode?: number;
+  matchedExpectations: string[];
+}): { status: PocVerificationStatus; diagnostic: string; retryable: boolean } {
+  if (result.success) {
+    return { status: 'verified', diagnostic: 'All expectations matched', retryable: false };
+  }
+  if (result.statusCode === 401 || result.statusCode === 403) {
+    return {
+      status: 'auth_failed',
+      diagnostic: `HTTP ${result.statusCode} - credentials rejected. Re-login or check target.`,
+      retryable: true,
+    };
+  }
+  if (result.statusCode === 429) {
+    return {
+      status: 'rate_limited',
+      diagnostic: 'HTTP429 - target rate limited. Increase retry interval.',
+      retryable: true,
+    };
+  }
+  if (result.statusCode === 302) {
+    return {
+      status: 'auth_failed',
+      diagnostic: 'HTTP302 redirect to login - session expired.',
+      retryable: true,
+    };
+  }
+  const body = result.body?.toLowerCase() ?? '';
+  if (body.includes('you have an error in your sql syntax')) {
+    return {
+      status: 'payload_filtered',
+      diagnostic: 'SQL error leaked but no data dumped. WAF may block payload.',
+      retryable: false,
+    };
+  }
+  if (body.includes('no results') || body.includes('empty result')) {
+    return {
+      status: 'table_empty',
+      diagnostic: 'Query executed but returned0 rows. Database table may be empty.',
+      retryable: false,
+    };
+  }
+  if (result.matchedExpectations.length === 0 && result.body && result.body.length < 200) {
+    return {
+      status: 'no_data_returned',
+      diagnostic: 'Response too short to contain expected data.',
+      retryable: false,
+    };
+  }
+  if (result.statusCode === 0) {
+    return {
+      status: 'connection_error',
+      diagnostic: 'Connection refused or DNS failure.',
+      retryable: true,
+    };
+  }
+  if (result.statusCode === 404) {
+    return {
+      status: 'endpoint_changed',
+      diagnostic: 'HTTP404 - endpoint path may have changed.',
+      retryable: false,
+    };
+  }
+  if (result.statusCode === 500) {
+    return {
+      status: 'unsupported_target',
+      diagnostic: 'HTTP500 - server-side error. Target may not support this PoC.',
+      retryable: false,
+    };
+  }
+  return {
+    status: 'rejected',
+    diagnostic: 'No expectations matched. Check payload and target compatibility.',
+    retryable: false,
+  };
 }
 
 export const TARGETS: Record<PocTarget['name'], PocTarget> = {
@@ -140,6 +236,7 @@ export class PocSandbox {
             ...result,
             id: req.id,
             success: true,
+            status: 'verified',
             isolation: this.isolation,
             responseTimeMs: Date.now() - start,
             completedAt: Date.now(),
@@ -151,13 +248,27 @@ export class PocSandbox {
       }
     }
 
+    let lastResult: { statusCode?: number; body?: string } = {};
+    try {
+      lastResult =
+        this.isolation === 'docker'
+          ? await this.runInDocker(fullUrl, req)
+          : await this.runInProcess(fullUrl, req);
+    } catch {
+      /* ignore */
+    }
+    const inferred = inferStatus({ success: false, ...lastResult, matchedExpectations: [] });
+
     return {
       id: req.id,
       success: false,
+      status: inferred.status,
       isolation: this.isolation,
       responseTimeMs: Date.now() - start,
       matchedExpectations: [],
       error: lastError ?? 'all retries exhausted',
+      diagnostic: inferred.diagnostic,
+      retryable: inferred.retryable,
       completedAt: Date.now(),
     };
   }

@@ -179,3 +179,142 @@ describe('PocSandbox — result shape', () => {
     expect(result.isolation).toBe('process');
   });
 });
+
+describe('PocSandbox — status inference (SOP v1.0 iteration)', () => {
+  const { inferStatus } =
+    require('../../../src/poc/sandbox.js') as typeof import('../../../src/poc/sandbox.js');
+
+  test('verified when success=true', () => {
+    const r = inferStatus({ success: true, matchedExpectations: ['admin'] });
+    expect(r.status).toBe('verified');
+    expect(r.retryable).toBe(false);
+  });
+
+  test('auth_failed on HTTP401', () => {
+    const r = inferStatus({ success: false, statusCode: 401, matchedExpectations: [] });
+    expect(r.status).toBe('auth_failed');
+    expect(r.retryable).toBe(true);
+  });
+
+  test('auth_failed on HTTP302 redirect', () => {
+    const r = inferStatus({ success: false, statusCode: 302, matchedExpectations: [] });
+    expect(r.status).toBe('auth_failed');
+    expect(r.retryable).toBe(true);
+  });
+
+  test('rate_limited on HTTP429', () => {
+    const r = inferStatus({ success: false, statusCode: 429, matchedExpectations: [] });
+    expect(r.status).toBe('rate_limited');
+    expect(r.retryable).toBe(true);
+  });
+
+  test('payload_filtered when SQL error leaked', () => {
+    const r = inferStatus({
+      success: false,
+      statusCode: 200,
+      body: 'You have an error in your SQL syntax; check...',
+      matchedExpectations: [],
+    });
+    expect(r.status).toBe('payload_filtered');
+    expect(r.retryable).toBe(false);
+  });
+
+  test('table_empty when query returned no rows', () => {
+    const r = inferStatus({
+      success: false,
+      statusCode: 200,
+      body: 'No results found',
+      matchedExpectations: [],
+    });
+    expect(r.status).toBe('table_empty');
+    expect(r.retryable).toBe(false);
+  });
+
+  test('connection_error when statusCode=0', () => {
+    const r = inferStatus({ success: false, statusCode: 0, matchedExpectations: [] });
+    expect(r.status).toBe('connection_error');
+    expect(r.retryable).toBe(true);
+  });
+
+  test('endpoint_changed on HTTP404', () => {
+    const r = inferStatus({ success: false, statusCode: 404, matchedExpectations: [] });
+    expect(r.status).toBe('endpoint_changed');
+    expect(r.retryable).toBe(false);
+  });
+
+  test('unsupported_target on HTTP500', () => {
+    const r = inferStatus({ success: false, statusCode: 500, matchedExpectations: [] });
+    expect(r.status).toBe('unsupported_target');
+    expect(r.retryable).toBe(false);
+  });
+
+  test('no_data_returned when body short + no match', () => {
+    const r = inferStatus({
+      success: false,
+      statusCode: 200,
+      body: 'short',
+      matchedExpectations: [],
+    });
+    expect(r.status).toBe('no_data_returned');
+  });
+
+  test('diagnostic message present for all statuses', () => {
+    const statuses = ['verified', 'auth_failed', 'table_empty', 'payload_filtered', 'rejected'];
+    for (const s of statuses) {
+      const r = inferStatus({
+        success: s === 'verified',
+        statusCode: s === 'verified' ? 200 : 401,
+        matchedExpectations: [],
+      });
+      expect(r.diagnostic.length).toBeGreaterThan(0);
+    }
+  });
+});
+
+describe('PocSandbox — execute returns status field', () => {
+  let mockServer2: ReturnType<typeof Bun.serve> | null = null;
+  const MOCK_PORT2 = 19235;
+
+  beforeAll(() => {
+    mockServer2 = Bun.serve({
+      port: MOCK_PORT2,
+      async fetch(req) {
+        const url = new URL(req.url);
+        if (url.pathname === '/login.php') {
+          return new Response('Welcome', {
+            status: 200,
+            headers: { 'set-cookie': 'PHPSESSID=test; Path=/' },
+          });
+        }
+        if (url.pathname === '/vuln') {
+          return new Response('Error: no data', { status: 500 });
+        }
+        return new Response('Not Found', { status: 404 });
+      },
+    });
+  });
+
+  afterAll(() => {
+    mockServer2?.stop();
+  });
+
+  test('result.status is set (not undefined)', async () => {
+    const sb = new PocSandbox({
+      target: {
+        name: 'mock',
+        baseUrl: `http://localhost:${MOCK_PORT2}`,
+        credentials: { user: 'test', password: 'test', loginPath: '/login.php' },
+      },
+      isolation: 'process',
+    });
+    const result = await sb.execute({
+      id: 'test1',
+      method: 'GET',
+      url: '/vuln',
+      expected: { contains: 'admin' },
+      timeoutMs: 2000,
+    });
+    expect(result.status).toBeDefined();
+    expect(result.retryable).toBeDefined();
+  });
+});

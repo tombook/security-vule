@@ -167,12 +167,10 @@ export class VuleDaemon {
   private async runScan(files: string[]): Promise<DaemonFinding[]> {
     if (files.length === 0) return [];
     const findings: DaemonFinding[] = [];
-    const scannedFiles = new Set<string>();
 
     for (const f of files) {
       try {
         const fullPath = join(this.config.watchDir, f);
-        scannedFiles.add(fullPath);
         if (!existsSync(fullPath)) continue;
         const hash = await hashFile(fullPath);
         const fileFindings = await this.scanFile(fullPath, hash);
@@ -182,7 +180,7 @@ export class VuleDaemon {
       }
     }
 
-    this.diffAgainstBaseline(findings, scannedFiles);
+    this.diffAgainstBaseline(findings);
     this.scansCompleted++;
     await this.emit({
       type: 'scan-completed',
@@ -224,20 +222,9 @@ export class VuleDaemon {
     return findings;
   }
 
-  private diffAgainstBaseline(newFindings: DaemonFinding[], scannedFiles?: Set<string>): void {
+  private diffAgainstBaseline(newFindings: DaemonFinding[]): void {
     const newMap = new Map<string, DaemonFinding>();
     for (const f of newFindings) newMap.set(f.id, f);
-
-    const scanned = scannedFiles ?? new Set(newFindings.map((f) => f.file));
-    const merged = new Map<string, DaemonFinding>();
-    for (const [id, finding] of this.baseline) {
-      if (!scanned.has(finding.file)) {
-        merged.set(id, finding);
-      }
-    }
-    for (const [id, finding] of newMap) {
-      merged.set(id, finding);
-    }
 
     const added: DaemonFinding[] = [];
     const removed: DaemonFinding[] = [];
@@ -254,7 +241,7 @@ export class VuleDaemon {
     }
 
     for (const [id, finding] of this.baseline) {
-      if (!merged.has(id)) {
+      if (!newMap.has(id)) {
         removed.push(finding);
         void this.emit({
           type: 'finding-removed',
@@ -264,7 +251,7 @@ export class VuleDaemon {
       }
     }
 
-    this.baseline = merged;
+    this.baseline = newMap;
     this.saveBaseline();
     if (added.length > 0 || removed.length > 0) {
       void this.emit({
@@ -291,11 +278,6 @@ export class VuleDaemon {
             void this.stop();
             socket.write(JSON.stringify({ status: 'stopped' }) + '\n');
             socket.end();
-          } else if (cmd.startsWith('QUERY ')) {
-            const q = cmd.slice(6).trim();
-            void this.handleQuery(q).then((r) => {
-              socket.write(JSON.stringify(r) + '\n');
-            });
           } else {
             socket.write(JSON.stringify({ error: `unknown command: ${cmd}` }) + '\n');
           }
@@ -304,45 +286,6 @@ export class VuleDaemon {
       this.server?.listen(this.config.socketPath, () => resolve());
       this.server?.on('error', reject);
     });
-  }
-
-  private async handleQuery(
-    query: string
-  ): Promise<{
-    ok: boolean;
-    matches: number;
-    findings: Array<{ id: string; severity: string; type: string; file: string; line: number }>;
-    query: string;
-  }> {
-    const lowerQ = query.toLowerCase();
-    const matches: Array<{
-      id: string;
-      severity: string;
-      type: string;
-      file: string;
-      line: number;
-    }> = [];
-    const severityFilter = lowerQ.match(/severity\s*=\s*(\w+)/)?.[1]?.toUpperCase();
-    const typeFilter = lowerQ.match(/type\s*=\s*(\w+)/)?.[1];
-
-    for (const f of this.baseline.values()) {
-      if (severityFilter && f.severity.toUpperCase() !== severityFilter) continue;
-      if (typeFilter && !f.type.toLowerCase().includes(typeFilter.toLowerCase())) continue;
-      matches.push({
-        id: f.id,
-        severity: f.severity,
-        type: f.type,
-        file: f.file,
-        line: f.line,
-      });
-    }
-
-    return {
-      ok: true,
-      matches: matches.length,
-      findings: matches.slice(0, 50),
-      query,
-    };
   }
 
   private async emit(event: DaemonEvent): Promise<void> {

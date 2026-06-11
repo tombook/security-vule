@@ -283,6 +283,13 @@ async function runScan(job: ScanJob, code?: string): Promise<void> {
         severity: 'MEDIUM',
         dim: 'information',
       },
+      {
+        regex:
+          /(move_uploaded_file|copy\s*\(.*\$_FILES|file_put_contents\s*\(.*\$_FILES|chmod\s*\(.*upload)/i,
+        type: 'Insecure File Upload',
+        severity: 'HIGH',
+        dim: 'fileUpload',
+      },
     ];
 
     for (let i = 0; i < lines.length; i++) {
