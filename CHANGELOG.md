@@ -5,6 +5,29 @@ All notable changes to security-vule will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0] -2026-06-11
+
+### Added
+- **Web UI完整化**: `src/integration/commands/server.ts` — POST `/api/report` + GET `/report` with D3 + Plotly visualization; dashboard with drag-drop upload
+- **OWASP Agentic AI Top10 (2026)**: `src/llm/owasp-agentic.ts` — ASI01-ASI10 with32 patterns, CWE mappings, remediation guidance
+- **MCP server7/3/5**: `src/mcp/server.ts` —7 tools (`scan_code`, `scan_file`, `list_rules`, `lookup_cwe`, `threat_model`, `attack_surface`, `owasp_agentic_scan`) +3 resources +5 prompts (`security-review`, `spec-driven-vuln-fix`, `owasp-agentic-audit`, `skill-md-review`, `poc-verify`)
+- **VQL Query DSL**: `src/engine/cpg/vql.ts` — MATE-style declarative CPG queries with8 predicates +4 combinators + reachability methods
+- **6-stage multi-agent workflow**: `src/engine/workflow.ts` — SPEC→PLAN→BUILD→TEST→REVIEW→SHIP with skip/resume/onStageComplete hook
+- **`vule workflow` CLI**: `src/integration/commands/workflow.ts` — `--llm --owasp --poc --stage N --skip N --resume N --json`
+- **PocSandbox**: `src/poc/sandbox.ts` — TypeScript-native PoC executor with3 isolation modes (process/docker/mock), auto-login, retry
+- **SKILL.md scanner**: `src/skill/scanner.ts` — Claude Code plugin security with10 dangerous patterns + tool permission scoring +5 risk levels
+- **VuleDaemon (ralph-loop)**: `src/daemon/vule-daemon.ts` — persistent watcher with file events + baseline diff + Unix socket (STATE/SCAN/STOP) +6 event types
+- **IncrementalScanner (CodeQL-style)**: `src/scanner/incremental.ts` — SHA-256 hash + snapshot cache + added/modified/unchanged/deleted + cache hit rate reporting
+- **`vule daemon` CLI**: `src/integration/commands/daemon.ts` — start/stop/status with JSON output
+- **`vule analyze --incremental`**: incremental scan with `--cache` option
+- **README_CN evolution section**: comprehensive P0-P3 capabilities tables + test statistics +11 external reference projects
+
+### Tests
+-820 →937 tests (+117, +14%)
+-95 →102 test files (+7)
+- New:11 server tests,12 OWASP agentic tests,14 MCP tests,17 VQL tests,15 workflow tests,10 sandbox tests,18 skill tests,11 daemon tests,12 incremental tests,5 daemon CLI tests,6 incremental CLI tests
+- All tests pass;0 TypeScript errors;0 ESLint errors
+
 ## [Unreleased]
 
 ### Added
