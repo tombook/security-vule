@@ -1,11 +1,4 @@
-| 🔍 **CPG + VQL DSL** |5 edge kinds + MATE-style declarative queries (source/sink/paths) |
-| 🤖 **OWASP Agentic Top10 (2026)** | ASI01-ASI10 scanner with CWE mappings + remediation |
-| 🧠 **MCP server7/3/5** | Tools for AI agents +3 resources +5 spec-driven prompts |
-| 🔁 **6-stage multi-agent workflow** | SPEC→PLAN→BUILD→TEST→REVIEW→SHIP with skip/resume hooks |
-| 🐳 **Docker sandbox PoC** |3 isolation modes (process/docker/mock) with auto-login + retry |
-| 📋 **SKILL.md scanner** | Claude Code plugin security with10 dangerous patterns |
-| 🔄 **Persistent daemon** | ralph-loop watcher + Unix socket IPC + baseline diff |
-| ⚡ **Incremental scan** | CodeQL-style delta analysis (5-10x speedup) |<div align="center">
+<div align="center">
 
 # 🌌 security-vule
 
