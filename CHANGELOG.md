@@ -5,6 +5,47 @@ All notable changes to security-vule will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 1.0.0 (2026-06-12)
+
+
+### Features
+
+* **cli:** Sprint 5 — CLI + Web UI + D3/Plotly visualization ([a9d6d3b](https://github.com/tombook/security-vule/commit/a9d6d3b20ce42e4e6d1ced62682a977d2e8574d0))
+* **cpg:** Sprint 1 — CPG core (types/builder/queries/metrics/sinks) ([da497c8](https://github.com/tombook/security-vule/commit/da497c843d9755075bde21d9d5dba30d5db5119b))
+* **dimensions:** Sprint 3 — 4 P0 dimensions (gravity/kepler/orbital/nbody) ([bb3d961](https://github.com/tombook/security-vule/commit/bb3d9611f7d1eab1ba416201cc1b066332b93b8b))
+* **dimensions:** Sprint 4 — 5 P1 + 3 P2 dimensions (total 13) ([93a6607](https://github.com/tombook/security-vule/commit/93a6607d6b4871f4b8ae62b98d4b625a78793b19))
+* **dimensions:** Sprint 6 — 6 math framework dimensions (total 19) ([161fbb2](https://github.com/tombook/security-vule/commit/161fbb2bfc50953d100f7528241f2d379336b62a))
+* **dimensions:** Sprint 8 — 10 P3 dimensions (total 29 = full cosmic-galaxy + math frameworks) ([aaee567](https://github.com/tombook/security-vule/commit/aaee5673bb715c179b89b9a92a10dd9eb5df40da))
+* DomXssVerifier — Playwright-based DOM XSS verification (v1.8) ([866c3f3](https://github.com/tombook/security-vule/commit/866c3f395f21a6e2fa03c7bb501b1727a5dc0cd3))
+* **engine:** Sprint 2 — VuleEngine + UVRS deep integration ([a496727](https://github.com/tombook/security-vule/commit/a496727b5b6b938b0b1eeba7f313021f3b2c1546))
+* HA evolution — Anthropic Harness-inspired /triage + /patch + /threat-model ([61fcdff](https://github.com/tombook/security-vule/commit/61fcdffc9cd8775ff136a354e53ba6172a272690))
+* **integration:** Sprint 7 — cosmic-galaxy equivalence test + performance ([371a0f3](https://github.com/tombook/security-vule/commit/371a0f3135e9667e81e8426f9f1aa30e343846bf))
+* LLM mode improvements (specialized prompts, multi-finding, verify pass, TYPE_NORMALIZE) ([db91327](https://github.com/tombook/security-vule/commit/db91327da8cf76c212e485deb75cc3ef0763089d))
+* **observability:** Sprint E4 — pino + OpenTelemetry + prom-client + health ([86107e3](https://github.com/tombook/security-vule/commit/86107e3191e2632aefded830eb9e8f52e9e8ab64))
+* P0 evolution — Web UI + OWASP Agentic Top 10 + MCP 7/3/1 ([5a83b4b](https://github.com/tombook/security-vule/commit/5a83b4b471e41c503a05ef0deb0afc6b76dfef8c))
+* P1 evolution — VQL query DSL +6-stage multi-agent workflow ([aecec06](https://github.com/tombook/security-vule/commit/aecec065ae78793aa779d3d8ef21f304512685ce))
+* P2 evolution — PoC sandbox + SKILL.md scanner + MCP5 prompts ([c3506cd](https://github.com/tombook/security-vule/commit/c3506cd10177c63c8bc37c4079d590bcf43cdbf4))
+* P3 evolution — VuleDaemon + IncrementalScanner + README sync ([7df0eb5](https://github.com/tombook/security-vule/commit/7df0eb54ac47089c8e46b067ba99947d429fcc53))
+* P4 — CLI integration for daemon + incremental + CHANGELOG/SBOM ([c5d65fd](https://github.com/tombook/security-vule/commit/c5d65fd9b89d9893551215ef7a422113e3b06167))
+* payload database complete (Less-29~65) + PoC API endpoints (v1.8) ([ea34d4f](https://github.com/tombook/security-vule/commit/ea34d4f704875d0ade8f7f6e8bf68fd66c75457b))
+* PocSandbox v1.3 — WAF bypass payloads + 302 redirect + unbreakable detection ([1bc9a8c](https://github.com/tombook/security-vule/commit/1bc9a8cd32047bb3e9f4a550866870c5971d8e3b))
+* PocSandbox v1.4 — blind SQLi (SLEEP) detection + DVWA 21/21 + multi-target validation ([a5ae91a](https://github.com/tombook/security-vule/commit/a5ae91a113f5aac222c2f632809e84e650823fe4))
+* PocSandbox v1.5 — header/cookie injection + sqli-labs 66/66 + CRLF detection ([24d241a](https://github.com/tombook/security-vule/commit/24d241a4b019191a2f18a7d1450a2088a759a8a3))
+* PocSandbox v1.6 — noFollowRedirect + case-insensitive header matching + Pikachu 13/13 ([cebc80b](https://github.com/tombook/security-vule/commit/cebc80b9ce633e6cfc13673a18516d0985a7edd5))
+* **security:** Sprint E6 — gitleaks config + license CI gate (12-week roadmap done) ([03f589e](https://github.com/tombook/security-vule/commit/03f589efaa50b44fcdc3f90ca17a3035c4c9a503))
+* SOP v1.0 iteration — file-upload dimension + PocSandbox status inference + daemon QUERY + baseline fix ([989a6fc](https://github.com/tombook/security-vule/commit/989a6fc96a7a9f8baf758d4fd4d2566089bf2af2))
+* **ui:** product-grade Web UI with landing + scan + report + settings ([9a700db](https://github.com/tombook/security-vule/commit/9a700db8282ce808802b873e48e64dcad836f885))
+* v1.7 — 50 unit tests + payload database with injection type classification ([5f82bcf](https://github.com/tombook/security-vule/commit/5f82bcf1129a63d814c2a3464ea6ce9d4ada5863))
+* **v1.9:** bWAPP coverage + PoC API 增强 + DomXSS + Daemon24h ([ad30a49](https://github.com/tombook/security-vule/commit/ad30a499d9780d91c5428a0195f9c15f8ffba176))
+* VuleSandboxBridge + SSRF/XXE PoC validation (v1.7) ([2514512](https://github.com/tombook/security-vule/commit/251451222027e39ec8899b1edecca43ee91be353))
+
+
+### Bug Fixes
+
+* **poc:** Bridge payload.matches 反序列化 + targets 过滤 (v1.8.1) ([5c6f09d](https://github.com/tombook/security-vule/commit/5c6f09df5b2db2275614493762aaf76e7821a7a3))
+* PocSandbox bWAPP login + cookie jar + security_level +25 PoC verification ([ce03102](https://github.com/tombook/security-vule/commit/ce03102b0c67b1b636842413fbd1aaf94e0316d7))
+* **test:** property test unique IDs + performance threshold bump ([1e8307d](https://github.com/tombook/security-vule/commit/1e8307d297d69ac938f7f6c7f9e204691941a5bd))
+
 ## [1.9.0] -2026-06-12
 
 ### Added
