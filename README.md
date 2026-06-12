@@ -56,6 +56,25 @@ absolute path · 1090 unit tests.
 
 ---
 
+## 📸 UI Preview
+
+| | |
+|---|---|
+| 🏠 **Landing** — "Find vulnerabilities in 60 seconds" value-prop | `docs/screenshots/landing.png` |
+| 🔍 **Scan** — Upload/paste/3 examples (zero-CLI experience) | `docs/screenshots/scan.png` |
+| 📊 **Report** — UVRS scores, D3 risk distribution, Show fix | `docs/screenshots/report.png` |
+| ⚙️ **Settings** — Configurable dimensions + retention | `docs/screenshots/settings.png` |
+
+**Landing** — value prop in 3 seconds:
+
+![Landing](docs/screenshots/landing.png)
+
+**Report** — risk cards + D3 + concrete fix:
+
+![Report](docs/screenshots/report.png)
+
+---
+
 ## ✨ Features
 
 | | |
@@ -236,6 +255,10 @@ curl -sS -X POST http://localhost:3000/api/poc/dom-xss \
 | **sqli-labs** | 8082 | 59 | 55 | 93.2% | Error / Blind / Header / Cookie / Filter-bypass / WAF-bypass / Stacked |
 | **Pikachu** | 8083 | 4 | 4 | **100%** | SSRF (×3) + XXE |
 | **Total** | — | **112** | **98** | **87.5%** | 0 tool false positives |
+
+Live PoC verification UI (via `/api/poc/verify` + Web UI Report page):
+
+![Report](docs/screenshots/report.png)
 
 Also tested in raw HTTP via `curl` (sandbox-verified): 14 Pikachu vuln types
 (Brute Force, XSS, CSRF, SQLi, RCE, LFI, Unsafe Download, Unsafe Upload,
@@ -477,18 +500,10 @@ service, etc.), contact **licensing@security-vule.org**.
 - **[cosmic-galaxy](https://github.com/)** — Theoretical foundation (23 dimensions + 6 math frameworks)
 - **[Anthropic defending-code-reference-harness](https://github.com/anthropics/defending-code-reference-harness)** — Parallel sub-agent methodology
 - **[Alibaba open-code-review](https://github.com/alibaba/open-code-review)** — Git diff review patterns
-- **[tree-sitter](https://tree-sitter.github.io/)** — AST parsing
+- **[tree-sitter](https://github.com/)** — AST parsing
 - **[OWASP AI Security & Privacy](https://owasp.org/)** — AI red-team threat model
 
 ---
-
-<div align="center">
-
-**[⬆ Back to top](#-security-vule)**
-
-Made with 🌌 by the security-vule team
-
-</div>
 
 ## 🤖 Anthropic Harness-inspired capabilities
 
@@ -502,4 +517,100 @@ Inspired by [anthropics/defending-code-reference-harness](https://github.com/ant
 | Dedupe via fingerprint | SHA-256 fingerprint of `file:line:vulnType` | `fingerprintFinding()` |
 | Threat-model severity recalibration | Promote/demote based on internet-facing / internal / critical asset / PII | `recalibrateSeverity()` |
 
-**Result**:1090 tests pass (was948 → +142 new tests across v1.0-v1.9).0 TS errors.0 ESLint errors.
+---
+
+## 🌟 v1.0–v1.9 Evolution
+
+### 🎯 P0 — Core capability expansion
+
+| Capability | File | Description |
+|------------|------|-------------|
+| **Web UI complete** | `src/integration/commands/server.ts` | POST `/api/report` + GET `/report` with D3 + Plotly viz; drag-drop upload dashboard |
+| **OWASP Agentic Top10 (2026)** | `src/llm/owasp-agentic.ts` | ASI01-ASI10, 32 patterns, CWE-mapped, remediation guidance |
+| **MCP server** | `src/mcp/server.ts` | 7 tools + 3 resources + 7 prompts (Anthropic Harness compatible) |
+
+### 🚀 P1 — Engineering uplift
+
+| Capability | File | Description |
+|------------|------|-------------|
+| **VQL query DSL** | `src/engine/cpg/vql.ts` | MATE-MQL-style declarative CPG queries (8 predicates + 4 combinators + reachability) |
+| **6-stage workflow** | `src/engine/workflow.ts` | SPEC→PLAN→BUILD→TEST→REVIEW→SHIP, with skip/resume/hook |
+| **`vule workflow` CLI** | `src/integration/commands/workflow.ts` | `--llm --owasp --poc --stage N --skip N --resume N --json` |
+
+### 🔒 P2 — Sandbox & safety
+
+| Capability | File | Description |
+|------------|------|-------------|
+| **PocSandbox** | `src/poc/sandbox.ts` | TypeScript-native, 3 isolations (process/docker/mock), auto-login + retry |
+| **SKILL.md scanner** | `src/skill/scanner.ts` | Claude Code plugin security, 10 dangerous patterns + tool permission scoring |
+| **Spec-driven prompts** | `src/mcp/server.ts` | `spec-driven-vuln-fix` / `owasp-agentic-audit` / `skill-md-review` / `poc-verify` |
+
+### 🌀 P3 — Persistence
+
+| Capability | File | Description |
+|------------|------|-------------|
+| **VuleDaemon** | `src/daemon/vule-daemon.ts` | ralph-loop persistent watcher, file events + baseline diff + Unix socket + 6 event types |
+| **IncrementalScanner** | `src/scanner/incremental.ts` | CodeQL-style delta, only changed files, 5-10× speedup |
+| **File-upload dimension** | `src/engine/dimensions/file-upload.ts` | Dedicated 29th dimension for upload sink detection |
+
+### 🛠️ P4 — CLI integration
+
+| Capability | File | Description |
+|------------|------|-------------|
+| **`vule daemon` CLI** | `src/integration/commands/daemon.ts` | start/stop/status with JSON output, Unix socket IPC |
+| **`vule analyze --incremental`** | `src/integration/commands/analyze.ts` | CodeQL-style delta scan, cache hit rate report, JSON export |
+| **CHANGELOG + SBOM** | `CHANGELOG.md`, `sbom.json` | CycloneDX 1.5 (344 components) attached to releases |
+
+### 🌟 v1.7–v1.9 evolution (added)
+
+| Capability | File | Description |
+|------------|------|-------------|
+| **VuleSandboxBridge** | `src/poc/vule-sandbox-bridge.ts` | UVRS-driven PoC verification across 4 Docker targets (98/112 = 87.5% rate) |
+| **Payload database (112 entries)** | `src/poc/payload-database.ts` | DVWA 21 + bWAPP 28 + sqli-labs 59 + Pikachu 4 = 112 PoC exploits |
+| **PoC API** (`/api/poc/verify`) | `src/integration/commands/server.ts` | `types` filter + `detailed=true` per-result status/diagnostic |
+| **DOM XSS API** (`/api/poc/dom-xss`) | `src/poc/dom-xss-verifier.ts` | Playwright headless browser for client-side XSS |
+| **Source-level mining** | `src/scan-source.ts` (custom) | 124 unique findings across 514 scannable PHP files (18 CWEs) |
+
+### 📊 Test statistics
+
+| Phase | Tests | Files | Commits |
+|-------|-------|-------|---------|
+| Origin (v1.0.0) | 820 | 95 | — |
+| P0 (Web + OWASP + MCP) | +32 | 96 | `5a83b4b` |
+| P1 (VQL + Workflow) | +32 | 98 | `aecec06` |
+| P2 (Sandbox + SKILL + Prompts) | +30 | 100 | `c3506cd` |
+| P3 (Daemon + Incremental) | +23 | 102 | `7df0eb5` |
+| P4 (CLI integration) | +11 | 104 | `c5d65fd` |
+| v1.6–v1.7 (Sandbox + payload DB) | +85 | 110 | `5f82bcf` / `2514512` |
+| v1.8 (DomXSSVerifier + full payload) | +33 | 111 | `866c3f3` |
+| v1.8.1 (Bridge bug fix) | +0 | 111 | `5c6f09d` |
+| **v1.9 (bWAPP + API enhancements)** | **+1** | **112** | **`ad30a49`** |
+| **Current total (v1.9)** | **1090** | **112** | **+1743 lines** |
+
+### 🔌 External reference projects
+
+| Capability | Reference | Stars |
+|------------|-----------|-------|
+| CPG | GaloisInc/MATE | 195 |
+| Agent security | HeadyZhang/agent-audit | 183 |
+| Claude Code skills | athola/claude-night-market | 305 |
+| SKILL.md scanning | theinfosecguy/razin | 15 |
+| SkillScan sandbox | NMitchem/SkillScan | 3 |
+| Multi-agent workflow | Snowflake-Labs/cocoplus | 597 |
+| AI Agent Governance | microsoft/agent-governance-toolkit | 4186 |
+| Pentest MCP | 0xSteph/pentest-ai | 710 |
+| Claude Code OWASP | agamm/claude-code-owasp | 229 |
+| Persistent daemon | zclllyybb/OpenGiraffe | 98 |
+| GitHub CodeQL | github/codeql-action | 1700+ |
+
+**Result**: 1090 tests pass (was 948 → +142 new tests across v1.0-v1.9). 0 TS errors. 0 ESLint errors.
+
+---
+
+<div align="center">
+
+**[⬆ Back to top](#-security-vule)**
+
+Made with 🌌 by the security-vule team
+
+</div>

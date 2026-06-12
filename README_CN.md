@@ -40,6 +40,25 @@ security-vule 是**全球首个基于宇宙星系理论构建的漏洞扫描器*
 
 ---
 
+## 📸 界面预览
+
+| | |
+|---|---|
+| 🏠 **首页** — "60 秒内发现漏洞" 价值主张 | `docs/screenshots/landing.png` |
+| 🔍 **扫描** — 上传/粘贴/3 种示例（零 CLI 体验） | `docs/screenshots/scan.png` |
+| 📊 **报告** — UVRS 评分 + D3 风险图 + Show fix | `docs/screenshots/report.png` |
+| ⚙️ **设置** — 可配置维度 + 保留策略 | `docs/screenshots/settings.png` |
+
+**首页** —— 3 秒价值主张：
+
+![Landing](docs/screenshots/landing.png)
+
+**报告** —— 风险卡片 + D3 风险分布 + 具体修复：
+
+![Report](docs/screenshots/report.png)
+
+---
+
 ## ✨ 功能特性
 
 | | |
@@ -207,6 +226,10 @@ curl -sS -X POST http://localhost:3000/api/poc/dom-xss \
 | **sqli-labs** | 8082 | 59 | 55 | 93.2% | 报错 / 盲注 / 头部 / Cookie / 过滤绕过 / WAF 绕过 / 堆叠 |
 | **Pikachu** | 8083 | 4 | 4 | **100%** | SSRF (×3) + XXE |
 | **合计** | — | **112** | **98** | **87.5%** | 0 工具误报 |
+
+实时 PoC 验证界面（通过 `/api/poc/verify` + Web UI 报告页）：
+
+![Report](docs/screenshots/report.png)
 
 **源码层挖掘**（4 靶机，789 个 PHP 文件，514 个可扫描）：**124 个唯一 finding**，覆盖 18 个 CWE 类别 —— 见 [docs/sop-v1.8-source-mining-2026-06-11.md](docs/sop-v1.8-source-mining-2026-06-11.md)。
 
@@ -445,6 +468,20 @@ security-vule 采用 **AGPL-3.0** 许可证发布——详见 [LICENSE](LICENSE)
 - **[阿里 open-code-review](https://github.com/alibaba/open-code-review)** — Git diff 审查模式
 - **[tree-sitter](https://tree-sitter.github.io/)** — AST 解析
 - **[OWASP AI Security & Privacy](https://owasp.org/)** — AI 红队威胁模型
+
+---
+
+## 🤖 Anthropic Harness 启发能力
+
+受 [anthropics/defending-code-reference-harness](https://github.com/anthropics/defending-code-reference-harness) (5688 ⭐) 启发：
+
+| 能力 | security-vule 等价实现 | 文件 |
+|------|------------------------|------|
+| `/threat-model` 技能 | MCP `threat-model` 提示 + `src/threatmodel/threat-model.ts` 生成结构化 `THREAT_MODEL.md` | `src/threatmodel/threat-model.ts` |
+| `/triage` 技能 | MCP `triage-and-patch` 提示 + `src/triage/triage.ts`（去重 + 已知漏洞抑制 + 严重度重校 + 投票） | `src/triage/triage.ts` |
+| `/patch` 技能 | `src/patch/patcher.ts`（11 条 SQLi/XSS/eval/RCE/LFI 修复规则，自动验证） | `src/patch/patcher.ts` |
+| 通过指纹去重 | SHA-256 指纹 `file:line:vulnType` | `fingerprintFinding()` |
+| 威胁模型严重度重校 | 基于公网/内网/关键资产/PII 提升或降级 | `recalibrateSeverity()` |
 
 ---
 
