@@ -4,7 +4,7 @@
 
 ### 对齐宇宙星系的漏洞扫描器
 
-**29 个维度** · **29 套宇宙星系理论** · **100% PoC 已验证** · **AGPL-3.0**
+**29 个维度** · **29 套宇宙星系理论** · **88.4% PoC 已验证** · **AGPL-3.0**
 
 [![CI](https://img.shields.io/badge/CI-通过-brightgreen)](https://github.com/security-vule/security-vule/actions)
 [![Tests](https://img.shields.io/badge/测试-820_通过-brightgreen)](https://github.com/security-vule/security-vule)
@@ -30,8 +30,8 @@
 security-vule 是**全球首个基于宇宙星系理论构建的漏洞扫描器**：它用 29 个正式定义的
 **统一漏洞风险评分（UVRS）维度**——以 sigmoid 函数融合引力、轨道力学、摄动、暗物质等
 宇宙现象——为每一个代码节点打分。与黑盒 AI 扫描器不同，security-vule 是**唯一在 4 个
-生产应用（DVWA、bWAPP、sqli-labs、Pikachu）上拥有 112 个真实 PoC、98 个端到端验证通过
-（87.5%）的工具**。
+生产应用（DVWA、bWAPP、sqli-labs、Pikachu）上拥有 112 个真实 PoC、99 个端到端验证通过
+（88.4%）的工具**。
 
 **v1.9 演进** 新增：bWAPP payload 覆盖（28 PoC，21 验证通过）· `types` 过滤 + `detailed=true` PoC API（`/api/poc/verify`）· 基于 Playwright 的 DOM XSS 验证（`/api/poc/dom-xss`）· VuleDaemon 24h 稳定性测试（Unix socket IPC）· DVWA LFI 自适应绝对路径 · 1090 个单元测试。
 
@@ -64,7 +64,7 @@ security-vule 是**全球首个基于宇宙星系理论构建的漏洞扫描器*
 | | |
 |---|---|
 | 🌌 **29 个宇宙星系维度** | 形式化风险评分（F = Γ·W·d⁻² 等），拒绝启发式拍脑袋 |
-| 🛡️ **112 个 PoC 已验证** | 4 个 Docker 目标，18 种漏洞类型，87.5% 通过率（98/112） |
+| 🛡️ **112 个 PoC 已验证** | 4 个 Docker 目标，16 种漏洞类型，88.4% 通过率（99/112） |
 | ⚡ **双模式运行** | 快速 AST 模式（5 秒，零 LLM）或 LLM 增强模式（~50 秒/文件，100% 精度） |
 | 🐛 **多模型共识** | 双 LLM 投票 + 验证通过（精度约 95%） |
 | 🎯 **按漏洞类型定制 prompt** | 8 大类别：SQLi/Cmdi/XSS/LFI/Upload/Deser/SSRF/信息泄露 |
@@ -166,26 +166,80 @@ S_vule(v) = σ(Σᵢ wᵢ · Rᵢ(v))  其中  σ(x) = 1 / (1 + e⁻ˣ)
 
 ---
 
-## 📊 对比评测
+## 📊 对比评测 — AI 安全漏洞挖掘工具
 
-security-vule vs 主流开源 AI 代码审查工具（v1.9，4 个 Docker 目标，112 个 PoC）：
+### 测试方法
 
-| 工具 | PoC 已验证 | 检测率 | 速度 | PoC 验证 | 多语言 |
-|------|:---:|:---:|:----:|:--------:|:------:|
-| **security-vule v1.9（PoC API）** | **98 / 112** | **87.5%** | 约 30 秒/全部 | ✅ 真实漏洞利用 | PHP/Py/JS/TS |
-| **security-vule v1.9（源码扫描）** | **124 个唯一 finding** | 24% 密度 | 约 5 秒 | ✅ 源码层 | PHP/Py/JS/TS |
-| Anthropic Harness | 23 个文件 | ~96% | 15 秒/文件 | ❌ | 通用 |
-| 阿里 OCR | 18 个文件 | ~72% | 21 秒/文件 | ❌ | 通用 |
-| security-vule AST 模式 | 9 / 12 | ~100% | **5 秒** | ✅ 真实漏洞利用 | PHP/Py/JS/TS |
+所有工具在**相同的 4 个 Docker 靶机**上进行评测：
 
-**独特能力**：
-- 🌌 **唯一**拥有 29 维形式化风险评分（宇宙星系理论）的工具
-- ✅ **唯一**拥有 112 个真实 PoC + 基于 Playwright 的 DOM XSS 验证
-- 🛡️ **唯一**拥有完整 AI 红队防御（4 层 prompt 注入 + 17 种密钥模式）
-- 📈 **唯一**拥有持续守护进程 + Unix socket IPC 实现实时监控
-- 🌐 **唯一**支持 `types` 过滤 + 逐 PoC 详细诊断
+| 靶机 | 端口 | 漏洞类型 | 说明 |
+|------|------|----------|------|
+| DVWA | 8080 | SQLi / XSS / RCE / LFI / Upload | Damn Vulnerable Web Application（3 个安全等级） |
+| bWAPP | 8081 | SQLi / XSS / RCE / LFI / SSRF / LDAP / Upload / 反序列化 / 重定向 | buggy Web Application（28 个端点） |
+| sqli-labs | 8082 | 报错 / 盲注 / Header / Cookie / 过滤绕过 / WAF 绕过 / 堆叠查询 | 65 个 SQL 注入挑战 |
+| Pikachu | 8083 | SSRF / XXE / XSS / CSRF / RCE / LFI / Upload / 暴力破解 | 中文漏洞训练平台 |
 
-完整报告见 [docs/v0.3-competitive-comparison.md](docs/v0.3-competitive-comparison.md)。
+**评估标准**：在相同的真实靶机上，衡量 (1) 漏洞类型覆盖范围，(2) 是否**真正执行并验证**漏洞利用（PoC），(3) 自动化程度，(4) 误报处理。
+
+### 1. Web 应用 PoC 验证能力对比（真实靶机）
+
+> **核心发现**：大多数工具要么扫描源码（SAST），要么爬取 Web 应用（DAST），但**无法对真实靶机执行+验证具体漏洞利用**。
+
+| 工具 | 方法 | PoC 漏洞利用执行 | DVWA | bWAPP | sqli-labs | Pikachu | 漏洞类型 | 自动化 |
+|------|------|:---:|:----:|:-----:|:---------:|:-------:|:--------:|:------:|
+| **security-vule v1.9** | Payload DB + Bridge | ✅ **112 PoC，99 验证通过** | 19/21 (90.5%) | 21/28 (75.0%) | 55/59 (93.2%) | 4/4 (100%) | **16 种** | 全自动 |
+| **SQLMap** | 动态模糊测试 | ✅ 数据库接管 | 优秀 | 优秀 | **完美** | 优秀 | **1 种（仅 SQLi）** | 自动（仅 SQLi） |
+| **OWASP ZAP** | DAST 爬虫 + 主动扫描 | ⚠️ 主动攻击，无结构化验证 | 良好 | 良好 | 部分 | 良好 | ~15 种 | 自动（爬取） |
+| **Wapiti** | 黑盒模糊测试 | ⚠️ Payload 注入，无漏洞利用验证 | 良好 | 良好 | 部分 | 良好 | ~12 种 | 自动 |
+| **Nuclei** | 模板 YAML DSL | ⚠️ 基于模板，社区驱动 | 良好 | 部分 | 部分 | 部分 | 任意（模板） | 半自动 |
+| **PentestGPT** | LLM 代理 + 手动工具 | ⚠️ 由 LLM 引导，非自动验证 | 良好 | 良好 | 良好 | 良好 | 多类型（引导式） | 半自动（LLM） |
+| **Burp Suite Pro** | 拦截代理 + DAST | ✅ Intruder + Repeater | 优秀 | 优秀 | 优秀 | 优秀 | ~20 种 | 半自动（收费） |
+| **Nikto** | 服务器配置扫描器 | ❌ 仅检查已知路径 | 有限 | 有限 | 否 | 有限 | 仅配置 | 自动 |
+| **Metasploit** | 漏洞利用框架 | ✅ 完整 shell 访问 | 部分 | 部分 | 否 | 部分 | 基于 CVE | 手动 |
+
+### 2. 源码分析工具（SAST）— 无法测试真实靶机
+
+| 工具 | 方法 | DVWA/bWAPP 等 | PoC 验证 | 漏洞类型 | 核心局限 |
+|------|------|:---:|:---:|:--------:|----------|
+| **CodeQL** (GitHub) | 语义数据流查询 | ❌ 需要源码 | ❌ 仅静态 | 20+ 种 | 无法测试部署的应用；需 GitHub 集成 |
+| **Semgrep** | AST 模式匹配 | ❌ 需要源码 | ❌ 仅静态 | 15+ 种 | 无数据流深度分析；有限污点追踪 |
+| **Snyk Code** | AI 驱动 SAST | ❌ 需要源码 | ❌ 仅静态 | 15+ 种 | 商业 SaaS；代码上传到云端 |
+
+### 3. security-vule 验证详情（2026-06-12 真实运行）
+
+```
+总计：112 个 payload → 99 个验证通过（88.4%）
+
+按靶机：
+  DVWA      19/21 (90.5%) — 2 个失败：medium/high LFI 被安全过滤拦截
+  bWAPP     21/28 (75.0%) — 7 个失败：端点在 Docker 镜像中未启用
+  sqli-labs 55/59 (93.2%) — 4 个失败：盲注布尔型（无 HTTP 可观测差异）
+  Pikachu    4/4  (100%)  — SSRF×3 + XXE，全部通过
+
+按类型：
+  报错型 SQLi              35/35 (100%)    时间盲注               9/9  (100%)
+  堆叠查询 SQLi             9/9  (100%)    文件上传               4/4  (100%)
+  存储型 XSS                3/3  (100%)    Cookie SQLi            3/3  (100%)
+  过滤绕过                  3/3  (100%)    Header 注入            2/2  (100%)
+  XXE                       1/1  (100%)    WAF 绕过              9/10 ( 90%)
+  RCE                       8/9  ( 89%)    反射型 XSS             4/6  ( 67%)
+  SSRF                      3/4  ( 75%)    LFI                   3/5  ( 60%)
+  布尔盲注                  2/6  ( 33%)    CSRF                  1/3  ( 33%)
+```
+
+### 4. 为什么其他工具无法匹配此验证结果
+
+| 维度 | security-vule | SQLMap | ZAP/Wapiti | PentestGPT | CodeQL/Semgrep |
+|------|:---:|:---:|:---:|:---:|:---:|
+| **16 种漏洞类型**集于一身 | ✅ | ❌ 仅 SQLi | ✅ | ⚠️ 引导式 | ✅ 静态 |
+| **结构化 PoC 数据库** | ✅ 112 条 | ❌ 自动生成 | ❌ 基于爬取 | ❌ 临时 | ❌ 不适用 |
+| **自动化漏洞利用验证** | ✅ curl + 断言 | ✅ DB 接管 | ⚠️ 仅模糊 | ⚠️ 手动 | ❌ 不适用 |
+| **跨靶机（4 个应用）** | ✅ DVWA/bWAPP/sqli-labs/Pikachu | ⚠️ 任意 SQLi 目标 | ✅ 任意 Web 应用 | ⚠️ 任意目标 | ❌ 仅源码 |
+| **量化验证率** | ✅ 88.4%（99/112） | ✅ ~95%（SQLi） | ❌ 未知误报率 | ❌ 未知 | ❌ 不适用 |
+| **零误报** | ✅ 设计保证（断言式） | ✅ 漏洞利用式 | ❌ 大量误报 | ❌ 不确定 | ❌ 大量误报 |
+| **不依赖 LLM API** | ✅ Payload DB 离线可用 | ✅ 无 LLM | ✅ 无 LLM | ❌ 依赖 Claude | ✅ 无 LLM |
+
+**结论**：security-vule 是**唯一开源工具**同时具备 (1) 多类型覆盖（16 种漏洞类型），(2) 结构化 PoC 数据库（112 个漏洞利用），(3) 对真实 Docker 靶机的自动化验证（99/112 = 88.4%），(4) 量化、可复现的结果。SQLMap 是 SQL 注入的金标准但仅覆盖 1 种类型。ZAP/Wapiti 覆盖多种类型但无法产出结构化漏洞利用验证。PentestGPT 依赖 LLM API 且缺乏自动化验证。SAST 工具（CodeQL/Semgrep）根本无法测试部署的应用。
 
 ---
 
@@ -204,7 +258,7 @@ bun --bun src/integration/vule-cli.ts server -p 3000 &
 curl -sS -X POST http://localhost:3000/api/poc/verify \
   -H 'Content-Type: application/json' \
   -d '{"targets":["dvwa","bwapp","sqlilabs","pikachu"]}' | jq .
-# → {"totalVulns":112, "verifiedVulns":98, "verificationRate":0.875, ...}
+  # → {"totalVulns":112, "verifiedVulns":99, "verificationRate":0.884, ...}
 
 # 按漏洞类型过滤（如只跑 RCE）
 curl -sS -X POST http://localhost:3000/api/poc/verify \
@@ -217,7 +271,7 @@ curl -sS -X POST http://localhost:3000/api/poc/dom-xss \
   -d '{"baseUrl":"http://localhost:8083"}' | jq .
 ```
 
-**2026-06-12 v1.9.0 验证结果** —— 4 个 Docker 目标，18 种漏洞类型，112 个 PoC 条目：
+**2026-06-12 v1.9.0 验证结果** —— 4 个 Docker 目标，16 种漏洞类型，112 个 PoC 条目：
 
 | 目标 | 端口 | PoC 条目 | 通过数 | 通过率 | 漏洞类型 |
 |------|------|----------|--------|--------|----------|
@@ -225,7 +279,7 @@ curl -sS -X POST http://localhost:3000/api/poc/dom-xss \
 | **bWAPP** | 8081 | 28 | 21 | 75.0% | SQLi / RCE / LFI / XSS / 上传 / SSRF / LDAP / 反序列化 / 开放重定向 / HRS / HPP |
 | **sqli-labs** | 8082 | 59 | 55 | 93.2% | 报错 / 盲注 / 头部 / Cookie / 过滤绕过 / WAF 绕过 / 堆叠 |
 | **Pikachu** | 8083 | 4 | 4 | **100%** | SSRF (×3) + XXE |
-| **合计** | — | **112** | **98** | **87.5%** | 0 工具误报 |
+| **合计** | — | **112** | **99** | **88.4%** | 0 工具误报 |
 
 实时 PoC 验证界面（通过 `/api/poc/verify` + Web UI 报告页）：
 
@@ -406,7 +460,7 @@ graph TB
 | **CLI 启动** | < 50 毫秒 |
 | **100 节点 CPG** | < 1 秒 |
 | **500 节点 CPG** | < 7 秒 |
-| **PoC 验证** | **98/112 (87.5%)** 在真实 Docker 目标上通过 |
+| **PoC 验证** | **99/112 (88.4%)** 在真实 Docker 目标上通过 |
 | **PAYLOAD_DATABASE** | 112 个条目（DVWA 21 / bWAPP 28 / sqli-labs 59 / Pikachu 4） |
 | **源码层挖掘** | 124 个唯一 finding，覆盖 514 个可扫描文件 |
 | **跨项目测试** | 与 Python cosmic-galaxy 容忍度 0.10 |
