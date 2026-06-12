@@ -4,21 +4,19 @@
 
 ### Cosmic-galaxy aligned vulnerability scanner
 
-**29 dimensions** · **OWASP Agentic Top10** · **MCP7/3/5** · **VQL DSL** · **88.4% PoC-verified** · **AGPL-3.0**
+**29 dimensions** · **Cosmic-galaxy theory** · **88.4% PoC-verified** · **AGPL-3.0**
 
 [![CI](https://img.shields.io/badge/CI-passing-brightgreen)](https://github.com/security-vule/security-vule/actions)
-[![Tests](https://img.shields.io/badge/tests-948_passing-brightgreen)](https://github.com/security-vule/security-vule)
+[![Tests](https://img.shields.io/badge/tests-1090_passing-brightgreen)](https://github.com/security-vule/security-vule)
 [![Coverage](https://img.shields.io/badge/coverage-73%25-blue)](https://github.com/security-vule/security-vule)
 [![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL--3.0-blue.svg)](LICENSE)
 [![Bun](https://img.shields.io/badge/Bun-%3E=1.3-black)](https://bun.sh)
 [![TypeScript](https://img.shields.io/badge/TypeScript-strict-blue)](https://www.typescriptlang.org/)
-[![MCP](https://img.shields.io/badge/MCP-7_tools%2F3_res%2F5_prompts-purple)](https://modelcontextprotocol.io/)
-[![OWASP Agentic](https://img.shields.io/badge/OWASP_Agentic-ASI01--10-red)](https://genai.owasp.org/)
 
 [**Quick Start**](#-quick-start) ·
 [**Features**](#-features) ·
 [**29 Dimensions**](#-29-cosmic-galaxy-dimensions) ·
-[**Comparison**](#-comparison) ·
+[**Comparison**](#-comparison--ai-security-vulnerability-mining-tools) ·
 [**PoC Verification**](#-poc-verification) ·
 [**AI Security**](#-ai-security) ·
 [**Docs**](https://github.com/security-vule/security-vule/tree/main/docs)
@@ -29,19 +27,17 @@
 
 ## TL;DR
 
-security-vule is the **first vulnerability scanner built on cosmic-galaxy theory**: it
-scores every code node with a formal **29-dimension Unified Vulnerability Risk Score (UVRS)**
-— a sigmoid fusion of gravitational pull, orbital mechanics, perturbation, dark matter, and
-12 other cosmic phenomena. Unlike black-box AI scanners, security-vule is the **only tool
-with PoC-verified precision on 112 real exploits** across 4 production apps (DVWA, bWAPP,
-sqli-labs, Pikachu), achieving 88.4% automated verification rate (99/112).
+security-vule is the **world's first vulnerability scanner built on cosmic-galaxy theory**: it
+scores every code node with 29 formally-defined **Unified Vulnerability Risk Score (UVRS)**
+dimensions — a sigmoid fusion of gravitational pull, orbital mechanics, perturbation, dark matter,
+and other cosmic phenomena. Unlike black-box AI scanners, security-vule is the **only tool with
+112 real PoCs across 4 production apps (DVWA, bWAPP, sqli-labs, Pikachu), achieving 88.4%
+automated verification rate (99/112)**.
 
 **v1.9 evolution** adds: bWAPP payload coverage (28 PoCs, 21 verified) · `types` filter
-+ `detailed=true` PoC API (`/api/poc/verify`) · DOM XSS Playwright verifier
-(`/api/poc/dom-xss`) · VuleDaemon 24h stability (Unix socket IPC) · DVWA LFI adaptive
++ `detailed=true` PoC API (`/api/poc/verify`) · Playwright-based DOM XSS verification
+(`/api/poc/dom-xss`) · VuleDaemon 24h stability test (Unix socket IPC) · DVWA LFI adaptive
 absolute path · 1090 unit tests.
-
-**v1.1 evolution** adds: OWASP Agentic AI Top10 (2026) scanner (ASI01-ASI10) · MCP server with7 tools /3 resources /5 prompts · VQL declarative query DSL ·6-stage multi-agent workflow · Docker sandbox PoC executor · SKILL.md / Claude Code plugin scanner · persistent daemon (ralph-loop) · CodeQL-style incremental scan.
 
 > **Eat your own dog food.** security-vule scans others' code, and as an AI system itself,
 > it implements a 4-layer prompt-injection defense, 17-pattern secret redaction, and
@@ -53,16 +49,16 @@ absolute path · 1090 unit tests.
 
 | | |
 |---|---|
-| 🏠 **Landing** — "Find vulnerabilities in 60 seconds" value-prop | `docs/screenshots/landing.png` |
+| 🏠 **Landing** — "Find vulnerabilities in 60 seconds" value prop | `docs/screenshots/landing.png` |
 | 🔍 **Scan** — Upload/paste/3 examples (zero-CLI experience) | `docs/screenshots/scan.png` |
-| 📊 **Report** — UVRS scores, D3 risk distribution, Show fix | `docs/screenshots/report.png` |
-| ⚙️ **Settings** — Configurable dimensions + retention | `docs/screenshots/settings.png` |
+| 📊 **Report** — UVRS scores + D3 risk chart + Show fix | `docs/screenshots/report.png` |
+| ⚙️ **Settings** — Configurable dimensions + retention policy | `docs/screenshots/settings.png` |
 
 **Landing** — value prop in 3 seconds:
 
 ![Landing](docs/screenshots/landing.png)
 
-**Report** — risk cards + D3 + concrete fix:
+**Report** — risk cards + D3 risk distribution + concrete fix:
 
 ![Report](docs/screenshots/report.png)
 
@@ -92,7 +88,7 @@ absolute path · 1090 unit tests.
 ## 🚀 Quick Start
 
 ```bash
-# Prerequisites: Bun ≥1.3
+# Prerequisites: Bun ≥ 1.3
 curl -fsSL https://bun.sh/install | bash
 
 # Clone and install
@@ -102,10 +98,13 @@ cd security-vule && bun install
 # Fast AST scan (zero LLM cost, ~5s)
 bun --bun src/integration/vule-cli.ts analyze ./test-targets/php-vulns/
 
-# Incremental scan (CodeQL-style delta,5-10x speedup on cached runs)
+# LLM-enhanced scan (better recall, ~50s/file)
+export MINIMAX_API_KEY="sk-cp-..."  # or ZHIPU_API_KEY, ANTHROPIC_API_KEY, OPENAI_API_KEY
+
+# Incremental scan (CodeQL-style delta, 5-10x speedup on cached runs)
 bun --bun src/integration/vule-cli.ts analyze ./test-targets/ --incremental --cache .vule/cache.json
 
-#6-stage multi-agent workflow
+# 6-stage multi-agent workflow
 bun --bun src/integration/vule-cli.ts workflow ./test-targets/php-vulns/ --llm --owasp --stage BUILD
 
 # Persistent daemon (ralph-loop watcher + Unix socket IPC)
@@ -129,29 +128,14 @@ curl -sS -X POST http://localhost:3000/api/poc/dom-xss \
   -H 'Content-Type: application/json' \
   -d '{"baseUrl":"http://localhost:8083"}' | jq '.results[0]'
 
-# LLM-enhanced scan (better recall, ~50s/file)
 export MINIMAX_API_KEY="sk-cp-..." # or ZHIPU_API_KEY, ANTHROPIC_API_KEY, OPENAI_API_KEY
-bun --bun scripts/llm-scan.ts --mode failover --max-findings5 --verify test-targets/php-vulns/
+bun --bun scripts/llm-scan.ts --mode failover --max-findings 5 --verify test-targets/php-vulns/
 
-# List all29 dimensions
+# List all 29 dimensions
 bun --bun src/integration/vule-cli.ts list-dimensions
 ```
 
-**Output**:
-
-```
-🌌 VuleEngine Report (v1.0.0)
- Risk distribution: {CRITICAL:4, HIGH:1, MEDIUM:1, LOW:0}
-
-🔥 Top5 risk nodes:
-0.920 [CRITICAL] test.php:8 SQL Injection dominant=gravity
-0.880 [CRITICAL] test.php:9 Info Disclosure dominant=entropy
-0.870 [CRITICAL] test.php:7 Command Injection dominant=gravity
-0.850 [HIGH] test.php:5 XSS dominant=kepler
-0.650 [MEDIUM] test.php:11 File Inclusion dominant=tidal
-```
-
-**Output**:
+**Output example**:
 
 ```
 🌌 VuleEngine Report (v1.0.0)
@@ -178,13 +162,13 @@ S_vule(v) = σ(Σᵢ wᵢ · Rᵢ(v))  where  σ(x) = 1 / (1 + e⁻ˣ)
 
 | Tier | Dimensions | Weight | Theory |
 |------|------------|--------|--------|
-| **P0 (Core)** | `gravity` · `kepler` · `orbital` · `n-body` | 0.55 | Force · Distance · 6-elem · Consensus |
-| **P1 (Advanced)** | `perturbation` · `tidal` · `relativistic` · `darkMatter` · `entropy` | 0.38 | Drift · Chain · Curvature · Hidden · Chaos |
-| **P2 (Emergent)** | `quantum` · `topology` · `information` | 0.16 | Race · Cycles · Shannon |
-| **Math frameworks** | `typeTheory` · `functor` · `tda` · `pureFunctional` · `abstractInterpret` · `symbolicExec` | 0.18 | Type · Morphism · Persistent · Pure · Abstract · Symbolic |
-| **P3 (Cosmology)** | `chaos` · `phaseTransition` · `fieldTheory` · `fractal` · `nonEquilibrium` · `gameTheory` · `transfer` · `differentialGeometry` · `renormalization` · `categoryBasic` | 0.20 | Lyapunov · Ising · Lagrangian · Box · Onsager · Nash · Cross-file · Ricci · RG · Functor |
+| **P0 (Core)** | `gravity` · `kepler` · `orbital` · `n-body` | 0.55 | Gravity · Kepler · 6-element · N-body consensus |
+| **P1 (Advanced)** | `perturbation` · `tidal` · `relativistic` · `darkMatter` · `entropy` | 0.38 | Perturbation · Tidal chain · Curvature · Dark matter · Entropy |
+| **P2 (Emergent)** | `quantum` · `topology` · `information` | 0.16 | Quantum superposition · Topology · Shannon information |
+| **Math frameworks** | `typeTheory` · `functor` · `tda` · `pureFunctional` · `abstractInterpret` · `symbolicExec` | 0.18 | Type theory · Functor · Persistent homology · Pure function · Abstract interpretation · Symbolic execution |
+| **P3 (Cosmology)** | `chaos` · `phaseTransition` · `fieldTheory` · `fractal` · `nonEquilibrium` · `gameTheory` · `transfer` · `differentialGeometry` · `renormalization` · `categoryBasic` | 0.20 | Lyapunov · Ising · Lagrangian · Fractal · Onsager · Nash · Cross-file · Ricci flow · Renormalization group · Category theory |
 
-See [theory/dimensions/](docs/architecture/c4-model.md) for full formulas.
+See [docs/architecture/c4-model.md](docs/architecture/c4-model.md) for full formulas.
 
 ---
 
@@ -197,9 +181,9 @@ All tools evaluated on the **same 4 Docker targets** running locally:
 | Target | Port | Vuln Types | Description |
 |--------|------|------------|-------------|
 | DVWA | 8080 | SQLi / XSS / RCE / LFI / Upload | Damn Vulnerable Web Application (3 security levels) |
-| bWAPP | 8081 | SQLi / XSS / RCE / LFI / SSRF / LDAP / Upload / Unserialize / Redirect | buggy Web Application (28 endpoints) |
+| bWAPP | 8081 | SQLi / XSS / RCE / LFI / SSRF / LDAP / Upload / Deserialization / Redirect | buggy Web Application (28 endpoints) |
 | sqli-labs | 8082 | Error / Blind / Header / Cookie / Filter-bypass / WAF-bypass / Stacked | 65 SQL injection challenges |
-| Pikachu | 8083 | SSRF / XXE / XSS / CSRF / RCE / LFI / Upload / Brute Force | Chinese vuln training platform |
+| Pikachu | 8083 | SSRF / XXE / XSS / CSRF / RCE / LFI / Upload / Brute Force | Chinese vulnerability training platform |
 
 **Evaluation criteria**: Against the same live targets, measure (1) vuln type coverage, (2) whether the tool actually **executes and verifies** the exploit (PoC), (3) automation level, (4) false positive handling.
 
@@ -298,7 +282,7 @@ curl -sS -X POST http://localhost:3000/api/poc/dom-xss \
 | Target | Port | Entries | Verified | Rate | Vuln Types |
 |--------|------|---------|----------|------|------------|
 | **DVWA** | 8080 | 21 | 19 | 90.5% | SQLi / Blind SQLi / XSS-R / XSS-S / RCE / LFI / Upload |
-| **bWAPP** | 8081 | 28 | 21 | 75.0% | SQLi / RCE / LFI / XSS / Upload / SSRF / LDAP / Unserialize / Redirect / HRS / HPP |
+| **bWAPP** | 8081 | 28 | 21 | 75.0% | SQLi / RCE / LFI / XSS / Upload / SSRF / LDAP / Deserialization / Open Redirect / HRS / HPP |
 | **sqli-labs** | 8082 | 59 | 55 | 93.2% | Error / Blind / Header / Cookie / Filter-bypass / WAF-bypass / Stacked |
 | **Pikachu** | 8083 | 4 | 4 | **100%** | SSRF (×3) + XXE |
 | **Total** | — | **112** | **99** | **88.4%** | 0 tool false positives |
@@ -307,13 +291,12 @@ Live PoC verification UI (via `/api/poc/verify` + Web UI Report page):
 
 ![Report](docs/screenshots/report.png)
 
-Also tested in raw HTTP via `curl` (sandbox-verified): 14 Pikachu vuln types
-(Brute Force, XSS, CSRF, SQLi, RCE, LFI, Unsafe Download, Unsafe Upload,
-Over Permission, Directory Traversal, Info Leak, PHP Unserialize, XXE,
-URL Redirect) — see [docs/sop-v1.8-poc-evaluation-2026-06-11.md](docs/sop-v1.8-poc-evaluation-2026-06-11.md).
-
 **Source-level mining** (4 targets, 789 PHP files, 514 scannable): **124 unique findings** across
 18 CWE categories — see [docs/sop-v1.8-source-mining-2026-06-11.md](docs/sop-v1.8-source-mining-2026-06-11.md).
+
+Pikachu 14 vuln types (Brute Force, XSS, CSRF, SQLi, RCE, LFI, Unsafe Download, Unsafe Upload,
+Over Permission, Directory Traversal, Info Leak, PHP Unserialize, XXE, URL Redirect) also verified
+end-to-end via raw `curl` — see [docs/sop-v1.8-poc-evaluation-2026-06-11.md](docs/sop-v1.8-poc-evaluation-2026-06-11.md).
 
 ---
 
@@ -336,9 +319,9 @@ security-vule is itself an AI system subject to:
 |----------|---------------------|----------------|-----------------|
 | **Ollama (local)** | ❌ never | 0 (no network) | **Enterprise / proprietary code** |
 | Anthropic Claude | ❌ no | 0 days | Commercial |
-| Zhipu GLM-5.1 | ❌ no | 30 days | Default (works with this repo) |
+| Zhipu GLM-5.1 | ❌ no | 30 days | Default (verified with this project) |
 | OpenAI | ❌ no (opt-out) | 30 days | Commercial |
-| MiniMax | ❌ no | 30 days | Default (works with this repo) |
+| MiniMax | ❌ no | 30 days | Default (verified with this project) |
 
 See [docs/ai-security-expert-recommendations.md](docs/ai-security-expert-recommendations.md) for the full threat model.
 
@@ -354,12 +337,12 @@ vule daemon start|stop|status [-w <dir>] [-s <socket>] [-b <baseline>] [--json]
  # Persistent watcher (ralph-loop). Unix socket IPC for STATE/SCAN/STOP commands.
 
 vule workflow <target> [--llm] [--owasp] [--poc] [--stage N] [--skip N] [--resume N] [--json]
- #6-stage multi-agent review (spec→plan→build→test→review→ship)
+ # 6-stage multi-agent review (spec→plan→build→test→review→ship)
 
 vule dimension <name> <file> # Run single dimension detector
 vule visualize <report.html> # Open HTML report in browser
-vule server --port3000 # Start web UI server (/healthz, /metrics, /report)
-vule list-dimensions # Show all29 dimensions
+vule server --port 3000      # Start web UI server (/healthz, /metrics, /report)
+vule list-dimensions         # Show all 29 dimensions
 ```
 
 ### MCP Server (Model Context Protocol)
@@ -368,44 +351,44 @@ security-vule ships an MCP server (`bun --bun src/mcp/server.ts`) so AI agents (
 
 | Type | Count | Names |
 |------|------:|-------|
-| Tools |7 | `scan_code` · `scan_file` · `list_rules` · `lookup_cwe` · `threat_model` · `attack_surface` · `owasp_agentic_scan` |
-| Resources |3 | `security-vule://rules` · `agentic://top10` · `security-vule://stats` |
-| Prompts |5 | `security-review` · `spec-driven-vuln-fix` · `owasp-agentic-audit` · `skill-md-review` · `poc-verify` |
+| Tools | 7 | `scan_code` · `scan_file` · `list_rules` · `lookup_cwe` · `threat_model` · `attack_surface` · `owasp_agentic_scan` |
+| Resources | 3 | `security-vule://rules` · `agentic://top10` · `security-vule://stats` |
+| Prompts | 5 | `security-review` · `spec-driven-vuln-fix` · `owasp-agentic-audit` · `skill-md-review` · `poc-verify` |
 
 **Library API** (TypeScript):
 
 ```typescript
 import { VuleEngine, CPGBuilder, query, predicates, Workflow, PocSandbox, VuleDaemon, IncrementalScanner } from 'security-vule';
 
-//1. Build CPG + run VuleEngine with all29 dimensions
+// 1. Build CPG from source + run VuleEngine with all 29 dimensions
 const cpg = new CPGBuilder('php', 'test.php').build(programGraph);
 const engine = new VuleEngine(cpg, cpg.sinkNodes().map(n => n.id));
 const report = engine.analyze();
 
-//2. VQL declarative query (MATE-style)
+// 2. VQL declarative query (MATE-style)
 const sinks = query(cpg)
  .where('expr', predicates.nodeType('expr'))
  .and(predicates.isSink('php'))
  .execute();
 
-//3.6-stage workflow
+// 3. 6-stage workflow
 const wf = new Workflow({ target: 'app.php', language: 'php', enableLlm: true });
 const summary = await wf.runAll();
 
-//4. Sandbox PoC execution (process | docker | mock isolation)
+// 4. Sandbox PoC execution (process | docker | mock isolation)
 const sandbox = new PocSandbox({ target: 'dvwa', isolation: 'docker' });
 const result = await sandbox.execute({ method: 'GET', url: '/vuln', expected: { contains: 'admin' } });
 
-//5. CodeQL-style incremental scan
+// 5. CodeQL-style incremental scan
 const scanner = new IncrementalScanner({ sourceDir: '/app', cachePath: '.vule/cache.json', scanFile });
 const delta = await scanner.scan(); // { added, modified, unchanged, deleted, cacheHitRate }
 
-//6. Persistent daemon (ralph-loop watcher)
+// 6. Persistent daemon (ralph-loop watcher)
 const daemon = new VuleDaemon({ watchDir: '/app', socketPath: '/tmp/vule.sock' });
 await daemon.start();
 ```
 
-See [examples/](examples/) for5 working examples.
+See [examples/](examples/) for 5 working examples.
 
 ---
 
@@ -547,7 +530,7 @@ service, etc.), contact **licensing@security-vule.org**.
 - **[cosmic-galaxy](https://github.com/)** — Theoretical foundation (23 dimensions + 6 math frameworks)
 - **[Anthropic defending-code-reference-harness](https://github.com/anthropics/defending-code-reference-harness)** — Parallel sub-agent methodology
 - **[Alibaba open-code-review](https://github.com/alibaba/open-code-review)** — Git diff review patterns
-- **[tree-sitter](https://github.com/)** — AST parsing
+- **[tree-sitter](https://tree-sitter.github.io/)** — AST parsing
 - **[OWASP AI Security & Privacy](https://owasp.org/)** — AI red-team threat model
 
 ---
@@ -566,15 +549,21 @@ Inspired by [anthropics/defending-code-reference-harness](https://github.com/ant
 
 ---
 
-## 🌟 v1.0–v1.9 Evolution
+<div align="center">
+
+**[⬆ Back to top](#-security-vule)**
+
+Made with 🌌 by the security-vule team
+
+## 🌟 New Capabilities (2026-06 evolution)
 
 ### 🎯 P0 — Core capability expansion
 
 | Capability | File | Description |
 |------------|------|-------------|
-| **Web UI complete** | `src/integration/commands/server.ts` | POST `/api/report` + GET `/report` with D3 + Plotly viz; drag-drop upload dashboard |
-| **OWASP Agentic Top10 (2026)** | `src/llm/owasp-agentic.ts` | ASI01-ASI10, 32 patterns, CWE-mapped, remediation guidance |
-| **MCP server** | `src/mcp/server.ts` | 7 tools + 3 resources + 7 prompts (Anthropic Harness compatible) |
+| **Web UI complete** | `src/integration/commands/server.ts` | POST `/api/report` + GET `/report` with interactive D3 risk chart + Plotly radar; drag-drop upload dashboard |
+| **OWASP Agentic Top10 (2026)** | `src/llm/owasp-agentic.ts` | ASI01-ASI10, 32 patterns, each with CWE number + remediation guidance |
+| **MCP server** | `src/mcp/server.ts` | 7 tools + 3 resources + 5 spec-driven prompts |
 
 ### 🚀 P1 — Engineering uplift
 
@@ -584,21 +573,20 @@ Inspired by [anthropics/defending-code-reference-harness](https://github.com/ant
 | **6-stage workflow** | `src/engine/workflow.ts` | SPEC→PLAN→BUILD→TEST→REVIEW→SHIP, with skip/resume/hook |
 | **`vule workflow` CLI** | `src/integration/commands/workflow.ts` | `--llm --owasp --poc --stage N --skip N --resume N --json` |
 
-### 🔒 P2 — Sandbox & safety
+### 🔒 P2 — Security isolation
 
 | Capability | File | Description |
 |------------|------|-------------|
 | **PocSandbox** | `src/poc/sandbox.ts` | TypeScript-native, 3 isolations (process/docker/mock), auto-login + retry |
-| **SKILL.md scanner** | `src/skill/scanner.ts` | Claude Code plugin security, 10 dangerous patterns + tool permission scoring |
-| **Spec-driven prompts** | `src/mcp/server.ts` | `spec-driven-vuln-fix` / `owasp-agentic-audit` / `skill-md-review` / `poc-verify` |
+| **SKILL.md scanner** | `src/skill/scanner.ts` | Claude Code plugin security, 10 dangerous patterns + tool permission scoring + 5-level risk |
+| **5 spec-driven prompts** | `src/mcp/server.ts` | `spec-driven-vuln-fix` / `owasp-agentic-audit` / `skill-md-review` / `poc-verify` |
 
 ### 🌀 P3 — Persistence
 
 | Capability | File | Description |
 |------------|------|-------------|
 | **VuleDaemon** | `src/daemon/vule-daemon.ts` | ralph-loop persistent watcher, file events + baseline diff + Unix socket + 6 event types |
-| **IncrementalScanner** | `src/scanner/incremental.ts` | CodeQL-style delta, only changed files, 5-10× speedup |
-| **File-upload dimension** | `src/engine/dimensions/file-upload.ts` | Dedicated 29th dimension for upload sink detection |
+| **IncrementalScanner** | `src/scanner/incremental.ts` | CodeQL-style delta, only changed files, 5-10x speedup |
 
 ### 🛠️ P4 — CLI integration
 
@@ -607,16 +595,6 @@ Inspired by [anthropics/defending-code-reference-harness](https://github.com/ant
 | **`vule daemon` CLI** | `src/integration/commands/daemon.ts` | start/stop/status with JSON output, Unix socket IPC |
 | **`vule analyze --incremental`** | `src/integration/commands/analyze.ts` | CodeQL-style delta scan, cache hit rate report, JSON export |
 | **CHANGELOG + SBOM** | `CHANGELOG.md`, `sbom.json` | CycloneDX 1.5 (344 components) attached to releases |
-
-### 🌟 v1.7–v1.9 evolution (added)
-
-| Capability | File | Description |
-|------------|------|-------------|
-| **VuleSandboxBridge** | `src/poc/vule-sandbox-bridge.ts` | UVRS-driven PoC verification across 4 Docker targets (99/112 = 88.4% rate) |
-| **Payload database (112 entries)** | `src/poc/payload-database.ts` | DVWA 21 + bWAPP 28 + sqli-labs 59 + Pikachu 4 = 112 PoC exploits |
-| **PoC API** (`/api/poc/verify`) | `src/integration/commands/server.ts` | `types` filter + `detailed=true` per-result status/diagnostic |
-| **DOM XSS API** (`/api/poc/dom-xss`) | `src/poc/dom-xss-verifier.ts` | Playwright headless browser for client-side XSS |
-| **Source-level mining** | `src/scan-source.ts` (custom) | 124 unique findings across 514 scannable PHP files (18 CWEs) |
 
 ### 📊 Test statistics
 
@@ -650,14 +628,17 @@ Inspired by [anthropics/defending-code-reference-harness](https://github.com/ant
 | Persistent daemon | zclllyybb/OpenGiraffe | 98 |
 | GitHub CodeQL | github/codeql-action | 1700+ |
 
-**Result**: 1090 tests pass (was 948 → +142 new tests across v1.0-v1.9). 0 TS errors. 0 ESLint errors.
+### 🌟 v1.9 evolution (2026-06-12)
 
----
+| Capability | File | Description |
+|------------|------|-------------|
+| **bWAPP payload coverage** | `src/poc/payload-database.ts` | 28 entries (RCE×4 / SQLi×11 / LFI×2 / XSS×3 / Upload / SSRF / LDAP / Deserialization / Open Redirect / HRS / HPP), 21/28 = 75% live verified |
+| **PoC API enhancements** | `src/integration/commands/server.ts` | `types` filter + `detailed=true` status diagnostic + `statusBreakdown` aggregation |
+| **DOM XSS verification API** | `src/integration/commands/server.ts`, `src/poc/dom-xss-verifier.ts` | `POST /api/poc/dom-xss` integrating Playwright headless browser |
+| **VuleDaemon 24h stability** | `src/daemon/vule-daemon.ts` | Unix socket IPC (STATE/SCAN/STOP), persistent file watching |
+| **DVWA LFI adaptive path** | `src/poc/payload-database.ts` | Low mode uses absolute path, verification rate 85.7% → 90.5% |
+| **Bridge bug fix** | `src/poc/vule-sandbox-bridge.ts` | payload.matches string→RegExp deserialization + targets filtering |
 
-<div align="center">
-
-**[⬆ Back to top](#-security-vule)**
-
-Made with 🌌 by the security-vule team
+**v1.9 total test statistics**: 1090 tests pass / 0 fail (112 files, 6988 expect() calls) — +270 tests since v1.0.
 
 </div>
