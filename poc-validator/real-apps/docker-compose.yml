@@ -1,0 +1,120 @@
+# Real Vulnerable Web Apps for PoC Verification
+#
+# This docker-compose stack runs the actual GitHub top web vulnerability
+# applications used in security-vule's benchmark harness.
+#
+# Prerequisites:
+#   - Docker 20.10+ with docker-compose
+#   - 4GB+ available RAM
+#   - Ports 8080-8083 available
+#
+# Quick start:
+#   docker compose -f poc-validator/real-apps/docker-compose.yml up -d
+#   # wait 30s for DVWA to initialize DB
+#   docker compose -f poc-validator/real-apps/docker-compose.yml ps
+#
+# Tear down:
+#   docker compose -f poc-validator/real-apps/docker-compose.yml down -v
+#
+# What gets deployed:
+#   - DVWA        → http://localhost:8080   (admin/password)
+#   - bWAPP       → http://localhost:8081   (bee/bug)
+#   - sqli-labs   → http://localhost:8082   (root/-)
+#   - Pikachu     → http://localhost:8083   (no auth, init first)
+
+services:
+  dvwa:
+    image: vulnerables/web-dvwa:latest
+    platform: linux/amd64
+    container_name: sv-dvwa
+    ports:
+      - "8080:80"
+    environment:
+      - RECAPTCHA_PRIV_KEY=''
+      - RECAPTCHA_PUB_KEY=''
+      - SECURITY_LEVEL=low
+      - PHPIDS_ENABLED=0
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/login.php"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 30s
+    restart: unless-stopped
+    networks:
+      - sv-poc-net
+
+  bwapp:
+    image: raesene/bwapp:latest
+    platform: linux/amd64
+    container_name: sv-bwapp
+    ports:
+      - "8081:80"
+    environment:
+      - MYSQL_HOST=mysql-bwapp
+      - MYSQL_DATABASE=bwapp
+      - MYSQL_USER=root
+      - MYSQL_PASSWORD=''
+    depends_on:
+      mysql-bwapp:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 30s
+    restart: unless-stopped
+    networks:
+      - sv-poc-net
+
+  mysql-bwapp:
+    image: mysql:8.0
+    platform: linux/amd64
+    container_name: sv-mysql-bwapp
+    environment:
+      - MYSQL_ROOT_PASSWORD=root
+      - MYSQL_DATABASE=bwapp
+    volumes:
+      - bwapp-db:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-proot"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+    networks:
+      - sv-poc-net
+
+  sqlilabs:
+    image: acgpiano/sqli-labs:latest
+    platform: linux/amd64
+    container_name: sv-sqlilabs
+    ports:
+      - "8082:80"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 30s
+    restart: unless-stopped
+    networks:
+      - sv-poc-net
+
+  pikachu:
+    image: area39/pikachu:latest
+    platform: linux/amd64
+    container_name: sv-pikachu
+    ports:
+      - "8083:80"
+    restart: unless-stopped
+    networks:
+      - sv-poc-net
+
+volumes:
+  bwapp-db:
+
+networks:
+  sv-poc-net:
+    driver: bridge

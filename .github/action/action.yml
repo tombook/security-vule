@@ -1,0 +1,90 @@
+name: 'security-vule'
+description: 'Static + PoC-verified security scanning. Fails on CRITICAL findings. Emits SARIF for GitHub Code Scanning.'
+author: 'security-vule team'
+branding:
+  icon: 'shield'
+  color: 'red'
+
+inputs:
+  path:
+    description: 'Path to scan (relative to workspace root)'
+    required: false
+    default: '.'
+  fail-on:
+    description: 'Minimum severity to fail the build (CRITICAL, HIGH, MEDIUM, LOW, NONE)'
+    required: false
+    default: 'CRITICAL'
+  sarif-output:
+    description: 'Where to write SARIF output (relative to workspace root)'
+    required: false
+    default: 'security-vule.sarif'
+  baseline:
+    description: 'Path to baseline file (skip findings already in baseline)'
+    required: false
+    default: ''
+  diff:
+    description: 'Only show new findings since baseline'
+    required: false
+    default: 'false'
+  min-confidence:
+    description: 'Minimum confidence threshold (0..1)'
+    required: false
+    default: '0'
+  install-bun:
+    description: 'Whether to install bun if missing'
+    required: false
+    default: 'true'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Setup bun
+      if: inputs.install-bun == 'true'
+      shell: bash
+      run: |
+        if ! command -v bun >/dev/null 2>&1; then
+          echo "Installing bun..."
+          curl -fsSL https://bun.sh/install | bash
+          echo "$HOME/.bun/bin" >> "$GITHUB_PATH"
+        fi
+        bun --version
+
+    - name: Run security-vule scan
+      shell: bash
+      env:
+        NODE_ENV: production
+      run: |
+        set -e
+        SCAN_ARGS="scan '${{ inputs.path }}' --sarif --output '${{ inputs.sarif-output }}' --min-confidence ${{ inputs.min-confidence }}"
+        if [ -n "${{ inputs.baseline }}" ]; then
+          SCAN_ARGS="$SCAN_ARGS --baseline '${{ inputs.baseline }}'"
+          if [ "${{ inputs.diff }}" = "true" ]; then
+            SCAN_ARGS="$SCAN_ARGS --diff"
+          fi
+        fi
+        echo "Running: bun run src/cli.ts $SCAN_ARGS"
+        bun run src/cli.ts $SCAN_ARGS || SCAN_EXIT=$?
+        SCAN_EXIT=${SCAN_EXIT:-0}
+        echo "::notice::security-vule exit code: $SCAN_EXIT"
+        echo "SCAN_EXIT=$SCAN_EXIT" >> "$GITHUB_ENV"
+
+    - name: Upload SARIF
+      if: always()
+      uses: github/codeql-action/upload-sarif@v3
+      with:
+        sarif_file: ${{ inputs.sarif-output }}
+        category: security-vule
+
+    - name: Fail on critical findings
+      if: env.SCAN_EXIT != '0' && inputs.fail-on == 'CRITICAL'
+      shell: bash
+      run: |
+        echo "::error::security-vule found CRITICAL severity issues (exit=$SCAN_EXIT)"
+        exit 1
+
+    - name: Fail on high findings
+      if: env.SCAN_EXIT != '0' && inputs.fail-on == 'HIGH'
+      shell: bash
+      run: |
+        echo "::error::security-vule found HIGH+ severity issues (exit=$SCAN_EXIT)"
+        exit 1

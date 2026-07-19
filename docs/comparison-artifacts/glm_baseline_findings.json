@@ -1,0 +1,459 @@
+{
+  "tool": "GLM-5.1 baseline (Python parallel)",
+  "model": "glm-5.1",
+  "files_scanned": 57,
+  "findings_total": 50,
+  "duration_seconds": 2019.3,
+  "findings": [
+    {
+      "file": "api.low.php",
+      "line": "10-11",
+      "category": "xss",
+      "severity": "MEDIUM",
+      "confidence": 1.0,
+      "title": "Reflected Cross-Site Scripting (XSS) via REQUEST_URI",
+      "description": "The script extracts the user-controlled $_SERVER['REQUEST_URI'] into the variable $stripped_url. This variable is subsequently embedded directly into a JavaScript string within a <script> tag without any sanitization or output encoding. An attacker can craft a malicious URL containing a single quote (') to break out of the string context and execute arbitrary JavaScript code in the victim's browser."
+    },
+    {
+      "file": "bac.medium.php",
+      "line": "55-58",
+      "category": "sql-injection",
+      "severity": "HIGH",
+      "confidence": 0.95,
+      "title": "SQL Injection via X-Forwarded-For HTTP header",
+      "description": "The value of $_SERVER['HTTP_X_FORWARDED_FOR'] is fully attacker-controlled (it is a client-set request header) and is interpolated directly into the INSERT statement without sanitization or parameterization: \"...'{$ip}'\". An attacker can inject arbitrary SQL by sending a malicious X-Forwarded-For header, enabling data exfiltration, modification, or denial of service."
+    },
+    {
+      "file": "brute.high.php",
+      "line": 27,
+      "category": "xss",
+      "severity": "HIGH",
+      "confidence": 0.95,
+      "title": "Reflected XSS via unsanitized username output",
+      "description": "The value of $_GET['username'] is assigned to $user, passed through stripslashes() and mysqli_real_escape_string(), and then embedded directly into HTML output via string interpolation: $html .= \"<p>Welcome to the password protected area {$user}</p>\". Neither stripslashes() nor mysqli_real_escape_string() encodes HTML-special characters like < > \" '. An attacker can craft a username such as <script>alert(1)</script> which will execute arbitrary JavaScript in the victim's browser when the login succeeds (or even reflected back on certain conditions)."
+    },
+    {
+      "file": "brute.high.php",
+      "line": 15,
+      "category": "weak-crypto",
+      "severity": "MEDIUM",
+      "confidence": 1.0,
+      "title": "Password hashed with MD5",
+      "description": "The user-supplied password is hashed using md5($pass) on line 15 before being used in the database query. MD5 is a fast, broken hash algorithm unsuitable for password storage \u2014 it is vulnerable to brute-force, rainbow-table, and collision attacks. A proper password hashing algorithm such as bcrypt, Argon2, or PBKDF2 should be used instead."
+    },
+    {
+      "file": "brute.low.php",
+      "line": 11,
+      "category": "sql-injection",
+      "severity": "HIGH",
+      "confidence": 1.0,
+      "title": "SQL Injection via unsanitized username parameter",
+      "description": "The user-supplied value $_GET['username'] is directly interpolated into the SQL query string on line 11 without any sanitization or parameterized queries. An attacker can inject arbitrary SQL (e.g., ' OR 1=1 --) to bypass authentication, extract data, or modify the database. The $pass variable is also interpolated, though it passes through md5() first which limits injection there."
+    },
+    {
+      "file": "brute.low.php",
+      "line": 17,
+      "category": "xss",
+      "severity": "MEDIUM",
+      "confidence": 1.0,
+      "title": "Reflected XSS via username in HTML output",
+      "description": "The user-supplied $_GET['username'] value stored in $user is embedded directly into HTML output on line 17 without HTML-encoding or escaping: \"<p>Welcome to the password protected area {$user}</p>\". An attacker can inject arbitrary JavaScript by supplying a username like <script>alert(1)</script>."
+    },
+    {
+      "file": "brute.low.php",
+      "line": 18,
+      "category": "xss",
+      "severity": "MEDIUM",
+      "confidence": 0.9,
+      "title": "XSS via unsanitized avatar value from database",
+      "description": "The $avatar value retrieved from the database is embedded directly into an img src attribute on line 18 without sanitization: \"<img src=\\\"{$avatar}\\\" />\". An attacker who can control the avatar value in the database (e.g., via the SQL injection vulnerability) can inject JavaScript (e.g., \" onerror=\"alert(1)\"></img>). This also enables stored XSS if avatar values can be set through other application functionality."
+    },
+    {
+      "file": "brute.low.php",
+      "line": 9,
+      "category": "weak-crypto",
+      "severity": "MEDIUM",
+      "confidence": 1.0,
+      "title": "Password hashed with cryptographically broken MD5",
+      "description": "The password is hashed using md5() on line 9. MD5 is cryptographically broken, vulnerable to collision attacks, and extremely fast to brute-force. It lacks salting, making it susceptible to rainbow table attacks. Passwords should be hashed using dedicated password hashing algorithms like bcrypt, Argon2, or PBKDF2."
+    },
+    {
+      "file": "captcha.high.php",
+      "line": "15-17",
+      "category": "auth-bypass",
+      "severity": "MEDIUM",
+      "confidence": 1.0,
+      "title": "CAPTCHA Bypass via Hardcoded Backdoor",
+      "description": "The script contains a logical backdoor that allows an attacker to completely bypass the reCAPTCHA validation. By setting the POST parameter `g-recaptcha-response` to the hardcoded string `hidd3n_valu3` and the HTTP request header `User-Agent` to `reCAPTCHA`, the if-statement evaluates to true, allowing automated requests (e.g., for brute-force attacks) despite the CAPTCHA protection."
+    },
+    {
+      "file": "captcha.medium.php",
+      "line": "32-33",
+      "category": "xss",
+      "severity": "MEDIUM",
+      "confidence": 1.0,
+      "title": "Reflected XSS via unsanitized password fields in hidden form",
+      "description": "User-supplied POST parameters `password_new` and `password_conf` are directly embedded into HTML hidden input `value` attributes (lines 32-33) without HTML entity encoding. An attacker can inject a value like `\" onfocus=\"alert(1)\" autofocus=\"` to break out of the attribute and execute arbitrary JavaScript in the victim's browser context."
+    },
+    {
+      "file": "captcha.medium.php",
+      "line": 49,
+      "category": "auth-bypass",
+      "severity": "MEDIUM",
+      "confidence": 1.0,
+      "title": "CAPTCHA bypass via client-side controlled parameter",
+      "description": "The CAPTCHA validation in step 1 is trivially bypassed by directly submitting a POST request with `step=2` and `passed_captcha=true`. The check on line 49 (`if( !$_POST['passed_captcha'] )`) trusts a client-supplied parameter to determine whether the CAPTCHA was completed, allowing an attacker to skip CAPTCHA verification entirely and proceed directly to the password change."
+    },
+    {
+      "file": "captcha.medium.php",
+      "line": 60,
+      "category": "weak-crypto",
+      "severity": "MEDIUM",
+      "confidence": 1.0,
+      "title": "Password hashed with unsalted MD5",
+      "description": "The new password is hashed using `md5()` on line 60 without any salt. MD5 is cryptographically broken and unsuitable for password storage \u2014 it is fast to compute, making offline brute-force and rainbow-table attacks trivial. A modern adaptive hashing algorithm (e.g., bcrypt, Argon2) should be used instead."
+    },
+    {
+      "file": "cryptography.low.php",
+      "line": "53, 87",
+      "category": "xss",
+      "severity": "MEDIUM",
+      "confidence": 0.95,
+      "title": "XSS via unsanitized $_SERVER['PHP_SELF'] in form action",
+      "description": "Two form elements embed $_SERVER['PHP_SELF'] directly into the HTML output without sanitization. An attacker can craft a URL like /path/file.php/\"><script>alert(1)</script> which injects arbitrary JavaScript into the page, executing in the victim's browser context. This is a classic reflected XSS vector via PHP_SELF."
+    },
+    {
+      "file": "cryptography.low.php",
+      "line": "3-14, 20",
+      "category": "weak-crypto",
+      "severity": "HIGH",
+      "confidence": 1.0,
+      "title": "XOR cipher with hardcoded short key provides no real encryption",
+      "description": "The xor_this() function implements a repeating-key XOR cipher using a hardcoded key (\"wachtwoord\"). XOR encryption is trivially breakable via known-plaintext attacks or frequency analysis. The key is visible in plaintext in the source code, and the \"challenge\" ciphertext (Lg4WGlQZChhSFBYSEB8bBQtPGxdNQSwEHREOAQY=) can be trivially decoded by anyone with access to the source or who can deduce the key through cryptanalysis. The entire \"secure\" messaging system provides no meaningful confidentiality."
+    },
+    {
+      "file": "cryptography.medium.php",
+      "line": 3,
+      "category": "weak-crypto",
+      "severity": "HIGH",
+      "confidence": 1.0,
+      "title": "AES-128-ECB enables block-replacement token forgery",
+      "description": "The decrypt function uses AES-128-ECB, which encrypts each 16-byte block independently and deterministically. This allows an attacker to perform a block-substitution attack: by mixing and matching ciphertext blocks from captured tokens (Sooty admin block + Soo valid-expiry block), an attacker can forge a valid admin token for user \"sweep\" with a future expiry. The application trusts the decrypted JSON to grant admin access (line 44), so the forged token achieves authentication bypass."
+    },
+    {
+      "file": "cryptography.medium.php",
+      "line": 69,
+      "category": "xss",
+      "severity": "MEDIUM",
+      "confidence": 1.0,
+      "title": "Reflected XSS via PHP_SELF in form action",
+      "description": "The form action attribute is built by directly concatenating $_SERVER['PHP_SELF'] into the HTML without escaping: `action=\\\"\" . $_SERVER['PHP_SELF'] . \"\\\"`. An attacker can craft a URL like `/cryptography.medium.php/\"><script>alert(1)</script>` which injects arbitrary JavaScript into the page, executing in the victim's browser context."
+    },
+    {
+      "file": "csp.high.php",
+      "line": 10,
+      "category": "xss",
+      "severity": "MEDIUM",
+      "confidence": 0.9,
+      "title": "Reflected Cross-Site Scripting (XSS) via 'include' parameter",
+      "description": "The script takes user input from the POST parameter 'include' and directly appends it to the HTML body without any sanitization or output encoding. While a strict Content-Security-Policy (CSP) header is implemented, it allows scripts from 'self'. An attacker can bypass this CSP and achieve JavaScript execution by injecting a script tag that points to an existing vulnerable endpoint on the same origin, such as the JSONP endpoint intended for the challenge (e.g., &lt;script src=\"/vulnerabilities/csp/source/jsonp.php?callback=alert(document.cookie)\"&gt;)."
+    },
+    {
+      "file": "csp.low.php",
+      "line": 15,
+      "category": "xss",
+      "severity": "HIGH",
+      "confidence": 1.0,
+      "title": "Reflected Cross-Site Scripting (XSS) via script source injection",
+      "description": "The `$_POST['include']` parameter is directly concatenated into the `src` attribute of a `&lt;script&gt;` tag without sanitization or output encoding. An attacker can inject arbitrary JavaScript either by breaking out of the attribute (e.g., `'></script><script>alert(1)</script>`) or by providing a URL pointing to a malicious payload hosted on one of the whitelisted domains (e.g., pastebin.com, unpkg.com) specified in the weak Content Security Policy (CSP), effectively bypassing the CSP protection."
+    },
+    {
+      "file": "csp.medium.php",
+      "line": 16,
+      "category": "xss",
+      "severity": "HIGH",
+      "confidence": 1.0,
+      "title": "Reflected Cross-Site Scripting (XSS) via unsanitized POST parameter",
+      "description": "The application takes user-supplied input from the $_POST['include'] parameter and directly concatenates it into the $page['body'] variable without any HTML entity encoding or sanitization. Although a Content-Security-Policy header is set, it includes the 'unsafe-inline' directive, which completely neutralizes the protection against inline scripts and allows attackers to easily execute arbitrary JavaScript code in the victim's browser."
+    },
+    {
+      "file": "csrf.high.php",
+      "line": 46,
+      "category": "weak-crypto",
+      "severity": "HIGH",
+      "confidence": 1.0,
+      "title": "Password hashed with MD5",
+      "description": "The new password is hashed using md5() before storage. MD5 is cryptographically broken and unsuitable for password hashing: it is fast to compute, vulnerable to collision attacks, and trivially crackable via rainbow tables and GPUs. An attacker who obtains the stored hash can recover the plaintext password efficiently. A modern adaptive key-derivation function (bcrypt, Argon2, scrypt) should be used instead."
+    },
+    {
+      "file": "csrf.high.php",
+      "line": 48,
+      "category": "sql-injection",
+      "severity": "HIGH",
+      "confidence": 0.8,
+      "title": "SQL injection via unsanitized $current_user",
+      "description": "The variable $current_user returned by dvwaCurrentUser() is interpolated directly into the SQL UPDATE query on line 48 without any escaping or parameterization. While $pass_new is escaped and then MD5-hashed (producing safe hex output), $current_user is used raw. If dvwaCurrentUser() returns any value derived from or influenceable by user data (e.g., a username stored in the session after registration or login without strict validation), an attacker can inject SQL to modify arbitrary rows or extract data."
+    },
+    {
+      "file": "csrf.medium.php",
+      "line": 4,
+      "category": "auth-bypass",
+      "severity": "MEDIUM",
+      "confidence": 0.95,
+      "title": "Bypassable anti-CSRF protection via Referer header check",
+      "description": "The code uses `stripos($_SERVER['HTTP_REFERER'], $_SERVER['SERVER_NAME'])` to validate the origin of the request. This check is trivially bypassable because it only verifies that the server name appears anywhere in the Referer string \u2014 not that it is the actual hostname. An attacker can craft a CSRF payload hosted at a URL like `http://evil.com/attacker.com` (if SERVER_NAME is `attacker.com`), or register a subdomain like `http://attacker.com.evil.com`, and the check will pass. This allows an authenticated victim's password to be changed via a cross-site request forged by the attacker. Additionally, the Referer header can be stripped by privacy settings or browser extensions, causing false negatives."
+    },
+    {
+      "file": "csrf.medium.php",
+      "line": 19,
+      "category": "weak-crypto",
+      "severity": "MEDIUM",
+      "confidence": 1.0,
+      "title": "Password hashed with cryptographically broken MD5 algorithm",
+      "description": "The password is hashed using `md5($pass_new)` before storage. MD5 is cryptographically broken: it is fast to compute, vulnerable to collision attacks, and unsuitable for password hashing. An attacker who obtains the database can crack MD5 hashes at billions of guesses per second using modern GPUs and rainbow tables. A proper password hashing algorithm such as bcrypt, Argon2, or PBKDF2 should be used instead."
+    },
+    {
+      "file": "exec.low.php",
+      "line": 11,
+      "category": "command-injection",
+      "severity": "HIGH",
+      "confidence": 1.0,
+      "title": "Remote Command Execution via Unsanitized Input",
+      "description": "The script takes user input from $_REQUEST['ip'] and directly concatenates it into the shell_exec() function without any sanitization or validation. An attacker can inject arbitrary OS commands using shell metacharacters (e.g., ';', '&&', '|') to execute arbitrary code on the underlying operating system."
+    },
+    {
+      "file": "exec.medium.php",
+      "line": 19,
+      "category": "command-injection",
+      "severity": "HIGH",
+      "confidence": 1.0,
+      "title": "OS Command Injection via Insufficient Blacklist Bypass",
+      "description": "The application takes user-controlled input from `$_REQUEST['ip']` and passes it directly to the `shell_exec()` function without proper sanitization. The application attempts to block dangerous characters using a blacklist that only removes `&&` and `;`. An attacker can easily bypass this filter by using alternative shell metacharacters such as `|`, `||`, `&`, or backticks (` ` `) to chain arbitrary operating system commands."
+    },
+    {
+      "file": "fi.low.php",
+      "line": 4,
+      "category": "file-inclusion",
+      "severity": "HIGH",
+      "confidence": 0.9,
+      "title": "Local File Inclusion (LFI) via Unsanitized GET Parameter",
+      "description": "The script takes the 'page' parameter from the GET request and assigns it directly to the $file variable without any sanitization or path validation. Based on the context (\"The page we wish to display\"), this variable is typically passed to an include() or require() statement in the broader application, allowing an attacker to include arbitrary local files (e.g., via \"?page=../../../../etc/passwd\")."
+    },
+    {
+      "file": "open_redirect.high.php",
+      "line": 5,
+      "category": "open-redirect",
+      "severity": "MEDIUM",
+      "confidence": 1.0,
+      "title": "Open Redirect via Bypassable Validation Check",
+      "description": "The application validates the 'redirect' GET parameter by checking if it contains the substring \"info.php\" using strpos(). An attacker can easily bypass this weak check by supplying a URL pointing to an external malicious domain that includes \"info.php\" in the path or query string (e.g., https://evil.com/info.php). Because the check does not verify that the target is a local, relative path or an authorized domain, the user is redirected to the attacker-controlled site, enabling phishing attacks."
+    },
+    {
+      "file": "open_redirect.low.php",
+      "line": 4,
+      "category": "open-redirect",
+      "severity": "MEDIUM",
+      "confidence": 1.0,
+      "title": "Unvalidated Open Redirect",
+      "description": "The script takes the 'redirect' parameter directly from the user-supplied GET request ($_GET['redirect']) and passes it directly into the HTTP 'Location' header without any validation or sanitization. This allows an attacker to craft a malicious link that appears to originate from a trusted domain but redirects the victim to an arbitrary, potentially malicious website, which is commonly used in phishing campaigns."
+    },
+    {
+      "file": "open_redirect.medium.php",
+      "line": 9,
+      "category": "open-redirect",
+      "severity": "MEDIUM",
+      "confidence": 0.9,
+      "title": "Open Redirect via Incomplete URL Scheme Filtering",
+      "description": "The application attempts to prevent open redirects by blocking URLs starting with \"http://\" or \"https://\" using a regular expression. However, this check can be easily bypassed using protocol-relative URLs (e.g., \"//attacker.com\") or other URI schemes (e.g., \"javascript:\", \"data:\"). When the unsanitized user input from $_GET['redirect'] is passed directly to the header() function, an attacker can successfully redirect the victim to a malicious external domain."
+    },
+    {
+      "file": "sqli.high.php",
+      "line": "14, 31",
+      "category": "sql-injection",
+      "severity": "HIGH",
+      "confidence": 0.75,
+      "title": "SQL Injection via unsanitized session value interpolated into SQL query",
+      "description": "The value stored in $_SESSION['id'] is directly interpolated into SQL query strings on both the MySQL and SQLite code paths without parameterization or escaping: \"SELECT first_name, last_name FROM users WHERE user_id = '$id' LIMIT 1;\". While $_SESSION is server-side storage, if the session 'id' value originates from or can be influenced by user input at any point in the application (e.g., during login, registration, or account manipulation), an attacker can inject SQL to extract or modify data."
+    },
+    {
+      "file": "sqli.high.php",
+      "line": "20, 38",
+      "category": "xss",
+      "severity": "MEDIUM",
+      "confidence": 0.8,
+      "title": "Stored XSS via unsanitized database values output in HTML",
+      "description": "Values retrieved from the database ($first, $last) and the session ($id) are concatenated directly into HTML output without HTML-encoding: $html .= \"<pre>ID: {$id}<br />First name: {$first}<br />Surname: {$last}</pre>\". If first_name or last_name contain malicious HTML/JavaScript stored in the database (e.g., set during user registration), it will execute in the victim's browser when this page is rendered, enabling stored XSS."
+    },
+    {
+      "file": "sqli.low.php",
+      "line": 12,
+      "category": "sql-injection",
+      "severity": "HIGH",
+      "confidence": 1.0,
+      "title": "SQL Injection via unsanitized $_REQUEST['id'] directly interpolated into SQL query",
+      "description": "User input from $_REQUEST['id'] is assigned to $id with no sanitization or parameterization. $id is then directly string-interpolated into SQL queries on both line 12 (MYSQL) and line 30 (SQLITE): \"SELECT first_name, last_name FROM users WHERE user_id = '$id';\". An attacker can supply malicious input such as ' OR 1=1 -- or ' UNION SELECT ... to manipulate the query, extract arbitrary data, or modify the database."
+    },
+    {
+      "file": "sqli.low.php",
+      "line": 19,
+      "category": "xss",
+      "severity": "MEDIUM",
+      "confidence": 0.95,
+      "title": "Reflected XSS via unsanitized $id and database values echoed in HTML",
+      "description": "User-supplied $id (from $_REQUEST['id']) and database values $first and $last are directly interpolated into HTML output on lines 19 and 40 without htmlspecialchars() or equivalent escaping: $html .= \"<pre>ID: {$id}<br />First name: {$first}<br />Surname: {$last}</pre>\". An attacker can inject arbitrary JavaScript by supplying $id as <script>alert(1)</script> or similar, which will execute in the victim's browser context."
+    },
+    {
+      "file": "sqli.medium.php",
+      "line": 12,
+      "category": "sql-injection",
+      "severity": "HIGH",
+      "confidence": 0.95,
+      "title": "SQL Injection via numeric context bypassing mysqli_real_escape_string",
+      "description": "The POST parameter 'id' is passed through mysqli_real_escape_string(), but the escaped value is interpolated into the SQL query WITHOUT quotes: \"WHERE user_id = $id\". mysqli_real_escape_string only escapes quote characters and special metacharacters, which is useless in an unquoted numeric context. An attacker can inject SQL directly using payloads like \"1 UNION SELECT user,password FROM users\" \u2014 no quotes needed, so the escaping is entirely bypassed. This affects both the MYSQL and SQLITE code paths (lines 12 and 23)."
+    },
+    {
+      "file": "sqli.medium.php",
+      "line": 18,
+      "category": "xss",
+      "severity": "MEDIUM",
+      "confidence": 0.9,
+      "title": "Reflected XSS via unsanitized id parameter in HTML output",
+      "description": "The user-supplied $id value is directly embedded into HTML output on line 18 without HTML encoding: $html .= \"<pre>ID: {$id}<br />...\". Since an attacker controls the id POST parameter and it is reflected back verbatim, they can inject arbitrary JavaScript (e.g., id=<script>alert(1)</script>). The same issue exists in the SQLITE branch on line 32. Database-retrieved values $first and $last are also output without encoding, enabling stored XSS if an attacker can influence those database fields."
+    },
+    {
+      "file": "sqli_blind.high.php",
+      "line": 12,
+      "category": "sql-injection",
+      "severity": "HIGH",
+      "confidence": 1.0,
+      "title": "Blind SQL Injection via Unsanitized Cookie Input",
+      "description": "The `$id` variable is retrieved directly from the user-controlled `$_COOKIE['id']` without any sanitization or validation. This variable is then concatenated directly into SQL query strings for both MYSQL (line 12) and SQLITE (line 29) database backends. Because the application logic branches based on whether the query returns a result (`$exists`), an attacker can easily manipulate the cookie value to inject arbitrary SQL commands and extract sensitive data via boolean-based blind SQL injection."
+    },
+    {
+      "file": "sqli_blind.low.php",
+      "line": "14,33",
+      "category": "sql-injection",
+      "severity": "HIGH",
+      "confidence": 1.0,
+      "title": "Blind SQL Injection via unsanitized $_GET['id'] parameter",
+      "description": "User input from $_GET['id'] is concatenated directly into SQL query strings on both the MYSQL and SQLITE code paths without any sanitization or parameterization. An attacker can inject arbitrary SQL (e.g., ' OR 1=1 --) to manipulate the query, enabling blind SQL injection to extract data, bypass logic, or enumerate the database. The application's boolean response (exists / missing) provides the oracle needed for blind exploitation."
+    },
+    {
+      "file": "upload.low.php",
+      "line": 9,
+      "category": "file-upload",
+      "severity": "HIGH",
+      "confidence": 1.0,
+      "title": "Unrestricted File Upload",
+      "description": "The script saves an uploaded file using move_uploaded_file() without performing any validation on the file extension, MIME type, or file contents. This allows an attacker to upload arbitrary files, such as a PHP web shell, and execute it on the server to gain remote code execution."
+    },
+    {
+      "file": "upload.low.php",
+      "line": 13,
+      "category": "xss",
+      "severity": "MEDIUM",
+      "confidence": 1.0,
+      "title": "Cross-Site Scripting (XSS) via Uploaded Filename",
+      "description": "The user-controlled uploaded filename is incorporated into the $target_path variable and subsequently echoed directly to the HTML output without sanitization or encoding. An attacker can craft a malicious filename containing JavaScript (e.g., <img src=x onerror=alert(1)>) to execute arbitrary code in the browser of the user viewing the upload response."
+    },
+    {
+      "file": "upload.medium.php",
+      "line": 16,
+      "category": "file-upload",
+      "severity": "HIGH",
+      "confidence": 1.0,
+      "title": "Arbitrary File Upload via Client-Side MIME Type Verification",
+      "description": "The application attempts to restrict file uploads to JPEG or PNG images by checking the `$uploaded_type` variable. This variable is derived from `$_FILES['uploaded']['type']`, which is entirely controlled by the attacker via the HTTP Content-Type header. Because the application does not validate the actual file contents (e.g., magic bytes) or the file extension, an attacker can easily bypass this restriction by uploading a malicious PHP script (e.g., shell.php) and spoofing the Content-Type header to `image/jpeg`. The file is then saved to the server with a executable extension, leading to Remote Code Execution (RCE)."
+    },
+    {
+      "file": "upload.medium.php",
+      "line": 22,
+      "category": "xss",
+      "severity": "MEDIUM",
+      "confidence": 0.9,
+      "title": "Cross-Site Scripting (XSS) via File Path Reflection",
+      "description": "The `$target_path` variable, which incorporates the user-controlled uploaded filename via `basename($_FILES['uploaded']['name'])`, is directly embedded into the HTML output without proper HTML encoding. If an attacker crafts a filename containing JavaScript payloads (e.g., `<img src=x onerror=alert(1)>.png`) and submits it with a valid MIME type, the payload will execute in the victim's browser when the upload message is rendered."
+    },
+    {
+      "file": "weak_id.high.php",
+      "line": 10,
+      "category": "weak-randomness",
+      "severity": "HIGH",
+      "confidence": 1.0,
+      "title": "Predictable Session ID Generation via Sequential Counter",
+      "description": "The application generates a session cookie (`dvwaSession`) by calculating the MD5 hash of a strictly sequential counter (`$_SESSION['last_session_id_high']`). Because the seed is entirely predictable (incrementing integers: 1, 2, 3, etc.), an attacker can easily calculate the session tokens assigned to other users by observing their own token and incrementing the integer base, leading to complete session hijacking."
+    },
+    {
+      "file": "weak_id.low.php",
+      "line": 11,
+      "category": "weak-randomness",
+      "severity": "HIGH",
+      "confidence": 0.9,
+      "title": "Predictable Session Identifier (Sequential Integer)",
+      "description": "The \"dvwaSession\" cookie is generated by sequentially incrementing an integer (`$_SESSION['last_session_id']++`). This lack of randomness makes the session token highly predictable, allowing an attacker to easily guess the session identifiers of other users and potentially hijack their sessions."
+    },
+    {
+      "file": "weak_id.medium.php",
+      "line": 6,
+      "category": "weak-randomness",
+      "severity": "HIGH",
+      "confidence": 1.0,
+      "title": "Predictable Session Token Generation",
+      "description": "The session cookie 'dvwaSession' is generated using the PHP `time()` function, which returns the current Unix timestamp in seconds. This value is entirely predictable. An attacker who knows roughly when a user's session was created can easily guess or brute-force the exact cookie value, allowing them to hijack the user's session (Session Fixation/Prediction)."
+    },
+    {
+      "file": "xss_d.medium.php",
+      "line": 7,
+      "category": "xss",
+      "severity": "HIGH",
+      "confidence": 0.9,
+      "title": "Insufficient Cross-Site Scripting (XSS) Filtering",
+      "description": "The code reads user input from `$_GET['default']` and applies a weak blacklist filter that only blocks the `<script` tag. This filter can be trivially bypassed using alternative HTML tags that execute JavaScript, such as `<img src=x onerror=alert(1)>`. If the `$default` variable is subsequently rendered in the HTML output without proper output encoding, it results in an exploitable Cross-Site Scripting (XSS) vulnerability."
+    },
+    {
+      "file": "xss_r.high.php",
+      "line": 9,
+      "category": "xss",
+      "severity": "MEDIUM",
+      "confidence": 1.0,
+      "title": "Reflected Cross-Site Scripting via Insufficient Tag Filtering",
+      "description": "The application reads user input from the `$_GET['name']` parameter and attempts to sanitize it by removing `<script>` tags using a regular expression. This blacklist approach is easily bypassed using alternative HTML tags that execute JavaScript (such as `<img src=x onerror=alert(1)>` or `<svg onload=alert(1)>`). The insufficiently sanitized string is then assigned to the `$html` variable, resulting in the execution of arbitrary client-side code when the payload is rendered in the victim's browser."
+    },
+    {
+      "file": "xss_r.low.php",
+      "line": 8,
+      "category": "xss",
+      "severity": "HIGH",
+      "confidence": 1.0,
+      "title": "Reflected Cross-Site Scripting (XSS) via unsanitized GET parameter",
+      "description": "The script takes user-supplied input from the 'name' GET parameter and directly concatenates it into the HTML output variable ($html) without any sanitization or HTML entity encoding. This allows an attacker to inject arbitrary client-side JavaScript. The vulnerability is made explicitly exploitable by the header 'X-XSS-Protection: 0', which disables the browser's built-in reflected XSS filter."
+    },
+    {
+      "file": "xss_r.medium.php",
+      "line": 9,
+      "category": "xss",
+      "severity": "MEDIUM",
+      "confidence": 1.0,
+      "title": "Reflected Cross-Site Scripting (XSS) via Case-Sensitive Filter Bypass",
+      "description": "User input from the GET parameter 'name' is echoed directly into the HTML output without proper encoding. The applied protection using str_replace('&lt;script&gt;', '', ...) is case-sensitive and only removes the exact lowercase match. An attacker can easily bypass this by using mixed-case variations (e.g., '&lt;Script&gt;') or entirely different HTML tags with event handlers (e.g., '&lt;img src=x onerror=alert(1)&gt;'). Furthermore, the script explicitly disables the browser's built-in XSS auditor via the header 'X-XSS-Protection: 0'."
+    },
+    {
+      "file": "xss_s.high.php",
+      "line": 19,
+      "category": "xss",
+      "severity": "HIGH",
+      "confidence": 1.0,
+      "title": "Stored XSS via insufficient sanitization of name parameter",
+      "description": "The `$name` input is only sanitized with a regex that strips `<script>` tags (and variants with interspersed characters). It does not block other HTML tags with event handlers. An attacker can inject payloads such as `<img src=x onerror=alert(1)>` or `<svg onload=alert(1)>`, which bypass the regex entirely. The value is then inserted into the database (stored) and will be rendered unsanitized when the guestbook is viewed, enabling persistent/stored XSS. While `mysqli_real_escape_string` prevents SQL injection, there is no HTML encoding (e.g., `htmlspecialchars`) applied to `$name`."
+    },
+    {
+      "file": "xss_s.medium.php",
+      "line": "17-18",
+      "category": "xss",
+      "severity": "HIGH",
+      "confidence": 1.0,
+      "title": "Stored XSS via weak HTML tag filtering on name parameter",
+      "description": "The $name input is sanitized only with str_replace('&lt;script&gt;', '', $name), which is trivially bypassed. It is case-sensitive (e.g., &lt;SCRIPT&gt;, &lt;ScRiPt&gt; bypass it) and only strips one specific tag \u2014 any other HTML tag with an event handler works (e.g., &lt;img src=x onerror=alert(1)&gt;, &lt;body onload=alert(1)&gt;, &lt;svg onload=alert(1)&gt;). The value is stored in the database via INSERT, and when later rendered in the guestbook without output encoding, the injected JavaScript executes in victims' browsers. mysqli_real_escape_string only prevents SQL injection, not XSS."
+    }
+  ]
+}

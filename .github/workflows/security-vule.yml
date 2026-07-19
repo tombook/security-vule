@@ -1,0 +1,126 @@
+name: security-vule
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: '0 6 * * 1'  # weekly Monday 06:00 UTC
+
+permissions:
+  contents: read
+  security-events: write
+  pull-requests: write
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/action
+        with:
+          path: '.'
+          fail-on: 'HIGH'
+          sarif-output: 'security-vule.sarif'
+
+  scan-with-poc:
+    runs-on: ubuntu-latest
+    needs: scan
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup bun
+        run: |
+          curl -fsSL https://bun.sh/install | bash
+          echo "$HOME/.bun/bin" >> "$GITHUB_PATH"
+      - name: Start mock DVWA
+        run: |
+          nohup python3 poc-validator/mock_dvwa.py 8080 > /tmp/mock_dvwa.log 2>&1 &
+          sleep 2
+          curl -fsS http://localhost:8080/ >/dev/null
+      - name: Run security-vule + PoC verify
+        run: |
+          bun run src/cli.ts scan . --output /tmp/sv_findings.json
+          python3 poc-validator/verify_poc.py \
+            --findings /tmp/sv_findings.json \
+            --output /tmp/sv_poc_verified.json
+        env:
+          LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
+      - name: Comment PoC results on PR (sanitized)
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const r = JSON.parse(fs.readFileSync('/tmp/sv_poc_verified.json', 'utf-8'));
+            const summary = [
+              `### security-vule PoC verification`,
+              ``,
+              `| Outcome | Count |`,
+              `|---|---|`,
+              `| **Verified (exploitable)** | **${r.verified}** |`,
+              `| Unverified (NOT exploitable) | ${r.unverified} |`,
+              `| Unconfirmed (no PoC) | ${r.unconfirmed} |`,
+              `| Total | ${r.total_findings} |`,
+              ``,
+              `Precision: ${r.verified}/${r.verified + r.unverified} = ${(r.verified/(r.verified+r.unverified||1)*100).toFixed(1)}%`,
+              ``,
+              `> AI Security: only statistics shared in PR comments. No code snippets, secrets, or LLM input/output leaves this runner. See \`security-vule.sarif\` for sanitized findings.`
+            ].join('\n');
+            github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: summary
+            });
+
+  ai-red-team:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup bun
+        run: |
+          curl -fsSL https://bun.sh/install | bash
+          echo "$HOME/.bun/bin" >> "$GITHUB_PATH"
+      - name: Run AI red team (defends security-vule's LLM pipeline)
+        run: |
+          bun scripts/ai-redteam.ts
+      - name: Run LLM chaos engineering tests
+        run: |
+          bun test tests/llm/chaos.test.ts
+      - name: Generate AI-BOM
+        run: |
+          cat > /tmp/ai-bom.ts << 'EOF'
+          import { buildAIBom, aiComponentFromProvider, formatAIBomTable } from './src/llm/ai-bom';
+          const bom = buildAIBom(process.env.GITHUB_REPOSITORY || 'unknown', '0.1.0', [
+            aiComponentFromProvider(process.env.LLM_PROVIDER || 'zhipu', process.env.LLM_MODEL || 'glm-5.1', { tokens: 1_000_000, costUsd: 5, calls: 10_000 }),
+          ]);
+          console.log(formatAIBomTable(bom));
+          require('fs').writeFileSync('ai-bom.json', JSON.stringify(bom, null, 2));
+          EOF
+          bun /tmp/ai-bom.ts
+      - name: Upload AI-BOM
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-vule-ai-bom
+          path: ai-bom.json
+
+  baseline-update:
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup bun
+        run: |
+          curl -fsSL https://bun.sh/install | bash
+          echo "$HOME/.bun/bin" >> "$GITHUB_PATH"
+      - name: Update baseline
+        run: |
+          bun run src/cli.ts scan . --output security-vule-baseline.json
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add security-vule-baseline.json
+          git diff --cached --quiet || git commit -m "chore: update security-vule baseline"
+          git push

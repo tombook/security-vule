@@ -1,0 +1,50 @@
+version: "3.9"
+
+# security-vule 本地开发环境
+# 启动: docker compose up -d
+# 停止: docker compose down
+# 清理数据: docker compose down -v
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: sv_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: security_vule
+      POSTGRES_PASSWORD: dev_password
+      POSTGRES_DB: security_vule
+      # RLS 性能优化:shared_buffers 根据容器内存调整
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C"
+    ports:
+      - "5433:5432"
+    volumes:
+      - sv_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U security_vule -d security_vule"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    command:
+      - "postgres"
+      - "-c"
+      - "shared_preload_libraries=pg_stat_statements"
+      - "-c"
+      - "log_min_duration_statement=200ms"
+
+  adminer:
+    image: adminer:4.8.1
+    container_name: sv_adminer
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "8090:8080"
+    environment:
+      ADMINER_DEFAULT_SERVER: postgres
+      ADMINER_DESIGN: pepa-linha-dark
+
+volumes:
+  sv_pgdata:
+    driver: local

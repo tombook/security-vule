@@ -1,0 +1,19 @@
+import { Pool } from "pg";
+const pg = new Pool({ connectionString: process.env.DATABASE_URL });
+const FID = "007fd43b-730e-f50d-1fb5-1ef2fef4eaf5";
+async function main() {
+  const client = await pg.connect();
+  try {
+    await client.query("SET app.current_tenant = '11111111-1111-1111-1111-111111111111'");
+    await client.query("SET app.current_user_role = 'ProviderOwner'");
+    const result = await client.query("DELETE FROM poc.poc_runs WHERE finding_id = $1 RETURNING id", [FID]);
+    console.log("Deleted:", result.rowCount, "poc_runs for finding", FID);
+    // Also delete usage event for clean comparison
+    await client.query("DELETE FROM usage.usage_events WHERE finding_id = $1", [FID]);
+    console.log("Deleted usage events for finding");
+  } finally {
+    client.release();
+    pg.end();
+  }
+}
+main().catch(e => { console.error(e); process.exit(1); });

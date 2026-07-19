@@ -1,0 +1,9 @@
+DO $$ BEGIN CREATE TYPE engine_type_enum AS ENUM ('semgrep','trivy','bandit','gosec','eslint_security','checkov','dfg_custom'); EXCEPTION WHEN duplicate_object THEN null; END $$;
+DO $$ BEGIN CREATE TYPE engine_health_enum AS ENUM ('healthy','degraded','unhealthy','unknown'); EXCEPTION WHEN duplicate_object THEN null; END $$;
+DO $$ BEGIN CREATE TYPE severity_enum AS ENUM ('critical','high','medium','low','info'); EXCEPTION WHEN duplicate_object THEN null; END $$;
+DO $$ BEGIN CREATE TYPE confidence_enum AS ENUM ('high','medium','low'); EXCEPTION WHEN duplicate_object THEN null; END $$;
+DO $$ BEGIN CREATE TYPE scan_trigger_enum AS ENUM ('ci','poll','manual','policy_change'); EXCEPTION WHEN duplicate_object THEN null; END $$;
+DO $$ BEGIN CREATE TYPE scan_status_enum AS ENUM ('queued','running','analyzing','done','partial','failed','canceled'); EXCEPTION WHEN duplicate_object THEN null; END $$;
+DO $$ BEGIN CREATE TYPE incremental_mode_enum AS ENUM ('file','call_graph','full'); EXCEPTION WHEN duplicate_object THEN null; END $$;
+DO $$ BEGIN CREATE TYPE finding_status_enum AS ENUM ('open','in_progress','confirmed','fixed','regressed','escalated','false_positive','accepted_risk','closed'); EXCEPTION WHEN duplicate_object THEN null; END $$;
+DO $$ BEGIN CREATE TYPE policy_scope_enum AS ENUM ('tenant','customer','project'); EXCEPTION WHEN duplicate_object THEN null; END $$;

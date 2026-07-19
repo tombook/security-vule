@@ -1,0 +1,48 @@
+# ── Secrets / env ──
+.env
+.env.*
+!.env.production.example
+
+# ── Dependencies / build outputs ──
+node_modules/
+dist/
+ui/dist/
+*.tsbuildinfo
+
+# ── Logs ──
+*.log
+firebase-debug.log
+
+# ── Runtime artefacts (security-vule specific) ──
+.vule/
+.vule-audit.jsonl
+.omo/
+.vule-scan-cache/
+
+# ── Lockfile: keep bun.lock, drop package-lock.json (legacy npm) ──
+package-lock.json
+
+# ── Worktrees (each has its own working tree) ──
+.worktrees/
+.kilo/worktrees/
+
+# ── Large data directories (not part of source) ──
+competitors/
+competitors-v2/
+competitors-v3/
+corpus/
+pikachu/
+sqli-labs/
+data/evolution/
+data/store/
+data/store-test-whitelabel/
+data/test-poc-library/
+data/test-poc-manager/
+data/test_target.php/
+
+# ── OS / editor ──
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~

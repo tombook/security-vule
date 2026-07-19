@@ -1,0 +1,30 @@
+import { Pool } from "pg";
+const pg = new Pool({ connectionString: process.env.DATABASE_URL });
+async function main() {
+  const engineId = "0000eeee-0000-0000-0000-000000000001";
+  await pg.query(
+    `INSERT INTO detection.engines (id, name, engine_type, version, enabled, tenant_id) VALUES ($1, 'semgrep', 'semgrep', '1.0.0', true, NULL) ON CONFLICT (id) DO NOTHING`,
+    [engineId]
+  );
+  const rules = [
+    { id: "1111aaaa-0000-0000-0000-000000000001", rid: 'sqli',       title: 'SQL injection via string concatenation', severity: 'critical' },
+    { id: "1111aaaa-0000-0000-0000-000000000002", rid: 'xss',        title: 'Reflected XSS via innerHTML', severity: 'high' },
+    { id: "1111aaaa-0000-0000-0000-000000000003", rid: 'cmd',        title: 'OS command injection', severity: 'critical' },
+    { id: "1111aaaa-0000-0000-0000-000000000004", rid: 'ssrf',       title: 'SSRF via URL parameter', severity: 'high' },
+    { id: "1111aaaa-0000-0000-0000-000000000005", rid: 'traversal',  title: 'Path traversal in file operation', severity: 'high' },
+    { id: "1111aaaa-0000-0000-0000-000000000006", rid: 'secret',     title: 'Hardcoded credential in source', severity: 'critical' },
+    { id: "1111aaaa-0000-0000-0000-000000000007", rid: 'md5',        title: 'Weak crypto: MD5 used for security', severity: 'medium' },
+    { id: "1111aaaa-0000-0000-0000-000000000008", rid: 'eval',       title: 'Dynamic code execution via eval', severity: 'critical' },
+  ];
+  for (const r of rules) {
+    await pg.query(
+      `INSERT INTO detection.rules (id, engine_id, rule_external_id, title, severity, default_enabled) VALUES ($1, $2, $3, $4, $5::severity_enum, true) ON CONFLICT (id) DO UPDATE SET rule_external_id = EXCLUDED.rule_external_id, title = EXCLUDED.title, severity = EXCLUDED.severity, default_enabled = true`,
+      [r.id, engineId, r.rid, r.title, r.severity]
+    );
+  }
+  const { rows } = await pg.query("SELECT rule_external_id, severity, title FROM detection.rules ORDER BY rule_external_id");
+  console.log("Rules:", rows.length);
+  for (const r of rows) console.log(" ", r.rule_external_id.padEnd(10), r.severity.padEnd(8), r.title);
+  await pg.end();
+}
+main().catch(e => { console.error(e); process.exit(1); });

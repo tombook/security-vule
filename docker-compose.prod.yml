@@ -1,0 +1,249 @@
+# security-vule production deployment
+# 用法:
+#   1. cp .env.production.example .env.production && 编辑填值
+#   2. mkdir -p secrets && echo "$(openssl rand -hex 32)" > secrets/db_password.txt
+#      echo "$(openssl rand -hex 32)" > secrets/jwt_secret.txt
+#      echo "$(openssl rand -hex 32)" > secrets/saml_webhook_secret.txt
+#      echo "$(openssl rand -hex 32)" > secrets/stripe_webhook_secret.txt
+#      # SAML IdP 私钥 (RSA-2048 PEM):
+#      openssl genrsa -out secrets/saml_idp_key.pem 2048
+#   3. docker compose -f docker-compose.prod.yml --env-file .env.production up -d
+#   4. ./scripts/healthcheck.sh
+
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "20m"
+    max-file: "5"
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: sv_prod_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: security_vule
+      POSTGRES_PASSWORD_FILE: /run/secrets/db_password
+      POSTGRES_DB: security_vule
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C"
+    ports:
+      - "5433:5432"
+    volumes:
+      - sv_prod_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U security_vule -d security_vule"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    command:
+      - "postgres"
+      - "-c"
+      - "shared_preload_libraries=pg_stat_statements"
+      - "-c"
+      - "log_min_duration_statement=200ms"
+      - "-c"
+      - "max_connections=200"
+      - "-c"
+      - "shared_buffers=512MB"
+    secrets:
+      - db_password
+    logging: *default-logging
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: "1.5"
+        reservations:
+          memory: 512M
+
+  redis:
+    image: redis:7-alpine
+    container_name: sv_prod_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - sv_prod_redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    command:
+      - "redis-server"
+      - "--maxmemory"
+      - "256mb"
+      - "--maxmemory-policy"
+      - "allkeys-lru"
+      - "--appendonly"
+      - "yes"
+    logging: *default-logging
+    deploy:
+      resources:
+        limits:
+          memory: 384M
+          cpus: "0.5"
+
+  migrate:
+    image: oven/bun:1.1.30-alpine
+    container_name: sv_prod_migrate
+    profiles: ["tools"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://security_vule:$(cat /run/secrets/db_password)@postgres:5432/security_vule
+    secrets:
+      - db_password
+    volumes:
+      - .:/app:ro
+    working_dir: /app
+    command: ["bun", "run", "scripts/migrate.ts"]
+    logging: *default-logging
+    restart: "no"
+
+  seed:
+    image: oven/bun:1.1.30-alpine
+    container_name: sv_prod_seed
+    profiles: ["tools"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    environment:
+      DATABASE_URL: postgresql://security_vule:$(cat /run/secrets/db_password)@postgres:5432/security_vule
+    secrets:
+      - db_password
+    volumes:
+      - .:/app:ro
+    working_dir: /app
+    command: ["bun", "run", "apps/api/src/db/seed.ts"]
+    logging: *default-logging
+    restart: "no"
+
+  api:
+    image: oven/bun:1.1.30-alpine
+    container_name: sv_prod_api
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DATABASE_URL: postgresql://security_vule:$(cat /run/secrets/db_password)@postgres:5432/security_vule
+      JWT_SECRET_FILE: /run/secrets/jwt_secret
+      JWT_EXPIRES_IN: 15m
+      REFRESH_TOKEN_EXPIRES_IN: 7d
+      FRONTEND_URL: ${FRONTEND_URL}
+      SAML_IDP_PUBLIC_KEY_FILE: /run/secrets/saml_idp_key
+      SAML_WEBHOOK_SECRET_FILE: /run/secrets/saml_webhook_secret
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
+      STRIPE_WEBHOOK_SECRET_FILE: /run/secrets/stripe_webhook_secret
+      STRIPE_MODE: ${STRIPE_MODE:-mock}
+      REDIS_URL: redis://redis:6379
+      LOG_LEVEL: info
+    secrets:
+      - db_password
+      - jwt_secret
+      - saml_idp_key
+      - saml_webhook_secret
+      - stripe_webhook_secret
+    ports:
+      - "3000:3000"
+    volumes:
+      - .:/app:ro
+    working_dir: /app
+    command:
+      - "bun"
+      - "run"
+      - "apps/api/src/index.ts"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3000/api/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 20s
+    logging: *default-logging
+    deploy:
+      resources:
+        limits:
+          memory: 768M
+          cpus: "1.0"
+        reservations:
+          memory: 256M
+
+  web:
+    image: oven/bun:1.1.30-alpine
+    container_name: sv_prod_web
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      VITE_API_BASE: ${VITE_API_BASE:-http://localhost:3000}
+    volumes:
+      - .:/app:ro
+    working_dir: /app/apps/web
+    command:
+      - "sh"
+      - "-c"
+      - "bun run install --frozen-lockfile && bun run build && bun run preview --port 5173 --host 0.0.0.0"
+    ports:
+      - "5173:5173"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:5173/ || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 30s
+    logging: *default-logging
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: "0.5"
+
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: sv_prod_nginx
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+      web:
+        condition: service_healthy
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./certs:/etc/nginx/certs:ro
+    logging: *default-logging
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+          cpus: "0.3"
+
+secrets:
+  db_password:
+    file: ./secrets/db_password.txt
+  jwt_secret:
+    file: ./secrets/jwt_secret.txt
+  saml_idp_key:
+    file: ./secrets/saml_idp_key.pem
+  saml_webhook_secret:
+    file: ./secrets/saml_webhook_secret.txt
+  stripe_webhook_secret:
+    file: ./secrets/stripe_webhook_secret.txt
+
+volumes:
+  sv_prod_pgdata:
+    driver: local
+  sv_prod_redisdata:
+    driver: local
